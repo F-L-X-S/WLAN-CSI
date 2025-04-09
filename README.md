@@ -31,10 +31,12 @@ Therefore the channel-frequency-response (transfer-function of the channel) is d
 $$H(\omega)=\frac{R(\omega)}{S(\omega)}$$
 
 ### Channel State Information in OFDM-systems
-Orthogonal frequency division multiplexing (OFDM) divides the allocated bandwidth into a number of subcarriers for transmitting data in parallel, but with a lower symbol-rate in each steam. Aim of this procedure is, to reduce the likelihood of symbol-interference within the seperated streams. The attenuation and phase of a single subcarrier represent a sample of the CFR at the center-frequency of the respective subcarrier:
+Orthogonal frequency division multiplexing (OFDM) divides the allocated bandwidth into a number of subcarriers for transmitting data in parallel, but with a lower symbol-rate in each steam. Aim of this procedure is, to reduce the likelihood of symbol-interference within the seperated streams. The attenuation and phase of a single subcarrier represent a sample of the CFR at the center-frequency of the respective subcarrier:<br>
 $$H(f_j)=||H(f_j)||e^{\angle H(f_j)}$$
-All CFR-samples in total are handles as the channel-state-information  [^1]:
+<br>
+All CFR-samples in total are handles as the channel-state-information  [^1]:<br>
 $$H=\{ H(f_j)|j\in [1, J]|, J\in \mathbb{N} \}$$
+<br>
 
 ### Estimation of CSI for OFDM-signals according to IEEE802.11n
 WLAN-transmissions use orthogonal frequency division multiplexing and divide the 20MHz channel into 64 subcarriers and the 40MHz channel into 128 subcarriers ([^2], chapter 2.3.7, S.1691). The original serial datastream is divided into parallel streams, each with a lower transmission-rate. A single Symbol of a parallelized stream is called OFDM-symbol. 
@@ -47,8 +49,9 @@ IEEE802.11n defines training-fields (predefined complex OFDM-Symbols) as a part 
 Because the OFDM-Symbols are predefined by the standardization, the spectrum of the sent signal $S(\omega)$ is known. According to the definition of the CSI as samples of the CFR on the respective center-frequency of each subcarrier, the CSI can be calculated by handling the vector, containing the complex scaling-factors of the training-fields, as the spectrum of the transmitted signal $S(f_j)$. The spectrum of the during the preamble-transmission received signal, sampled at the each subcarrier represents $R(f_j)$
 
 The receivers have to be synchronized for DoA-estimation, because
+<br>
 $$\mathcal{F} \{ r(t-\tau) \}=\mathcal{F} \{ r(t) \}*e^{-j\omega \tau}$$
-
+<br>
 ### References
 [^1]: Zheng Yang, Yi Zhang, Guoxuan Chi, Guidong Zhang, "Hands-on Wireless Sensing with Wi-Fi: A Tutorial" tns.thss.tsinghua.edu.cn, 2023, https://tns.thss.tsinghua.edu.cn/wst/docs/pre/
 (accessed April 4, 2025)
