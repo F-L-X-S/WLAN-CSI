@@ -25,11 +25,12 @@ Provides 2-20MS/s
 Provides 100MS/s
 
 ## Channel Frequency Response and Channel State Information
-A received signal can be described as the convolution of the transmitted signal $s(t)$ and the channel-impulse-response (CIR) $h(t)$:
+A received signal can be described as the convolution of the transmitted signal $s(t)$ and the channel-impulse-response (CIR) $h(t)$:<br>
 $$r(t)=s(t)\circledast h(t)$$ 
-Therefore the channel-frequency-response (transfer-function of the channel) is defined as  [^1]:
+<br>
+Therefore the channel-frequency-response (transfer-function of the channel) is defined as  [^1]:<br>
 $$H(\omega)=\frac{R(\omega)}{S(\omega)}$$
-
+<br>
 ### Channel State Information in OFDM-systems
 Orthogonal frequency division multiplexing (OFDM) divides the allocated bandwidth into a number of subcarriers for transmitting data in parallel, but with a lower symbol-rate in each steam. Aim of this procedure is, to reduce the likelihood of symbol-interference within the seperated streams. The attenuation and phase of a single subcarrier represent a sample of the CFR at the center-frequency of the respective subcarrier:<br>
 $$H(f_j)=||H(f_j)||e^{\angle H(f_j)}$$
