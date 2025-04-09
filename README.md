@@ -25,36 +25,60 @@ Provides 2-20MS/s
 Provides 100MS/s
 
 ## Channel Frequency Response and Channel State Information
-A received signal can be described as the convolution of the transmitted signal $s(t)$ and the channel-impulse-response (CIR) $h(t)$:<br>
+A received signal can be described as the convolution of the transmitted signal $s(t)$ and the channel-impulse-response (CIR) $h(t)$:
+<br>
+
 $$r(t)=s(t)\circledast h(t)$$ 
+
 <br>
-Therefore the channel-frequency-response (transfer-function of the channel) is defined as  [^1]:<br>
+Therefore the channel-frequency-response (transfer-function of the channel) is defined as  [^1]:
+<br>
+
 $$H(\omega)=\frac{R(\omega)}{S(\omega)}$$
+
 <br>
+
 ### Channel State Information in OFDM-systems
-Orthogonal frequency division multiplexing (OFDM) divides the allocated bandwidth into a number of subcarriers for transmitting data in parallel, but with a lower symbol-rate in each steam. Aim of this procedure is, to reduce the likelihood of symbol-interference within the seperated streams. The attenuation and phase of a single subcarrier represent a sample of the CFR at the center-frequency of the respective subcarrier:<br>
-$$H(f_j)=||H(f_j)||e^{\angle H(f_j)}$$
+Orthogonal frequency division multiplexing (OFDM) divides the allocated bandwidth into a number of subcarriers for transmitting data in parallel, but with a lower symbol-rate in each steam. Aim of this procedure is, to reduce the likelihood of symbol-interference within the seperated streams. The attenuation and phase of a single subcarrier represent a sample of the CFR at the center-frequency of the respective subcarrier:
 <br>
-All CFR-samples in total are handles as the channel-state-information  [^1]:<br>
+
+$$H(f_j)=||H(f_j)||e^{\angle H(f_j)}$$
+
+<br>All CFR-samples in total are handles as the channel-state-information  [^1]:
+<br>
+
 $$H=\{ H(f_j)|j\in [1, J]|, J\in \mathbb{N} \}$$
+
 <br>
 
 ### Estimation of CSI for OFDM-signals according to IEEE802.11n
 WLAN-transmissions use orthogonal frequency division multiplexing and divide the 20MHz channel into 64 subcarriers and the 40MHz channel into 128 subcarriers ([^2], chapter 2.3.7, S.1691). The original serial datastream is divided into parallel streams, each with a lower transmission-rate. A single Symbol of a parallelized stream is called OFDM-symbol. 
-<br>
 
 The IEEE 802.11n introduces the PLCP (physical layer convergence protocol), that adds a preamble and a PLCP-header to the PSDU (PLCP Service Data Unit). The composition of the whole PPDU (PLCP Protocol data unit) depends on the used transmision-mode (non-HT, mixed-HT and HT) (high-throughput) ([^2],  Figure 20-1, S.1682).
 
 IEEE802.11n defines training-fields (predefined complex OFDM-Symbols) as a part of the PPDU-preamble, that are transmitted on a subset of the respective subcarriers. The training-fields are used by the receiver for channel-estimation, time-synchronization, gain-control and carrier-offset. The OFDM-Symbols, transmitted by each subcarrier are defined in IEEE Std 802.11-2012 chapter 2.3.9.
-<br>
+
 Because the OFDM-Symbols are predefined by the standardization, the spectrum of the sent signal $S(\omega)$ is known. According to the definition of the CSI as samples of the CFR on the respective center-frequency of each subcarrier, the CSI can be calculated by handling the vector, containing the complex scaling-factors of the training-fields, as the spectrum of the transmitted signal $S(f_j)$. The spectrum of the during the preamble-transmission received signal, sampled at the each subcarrier represents $R(f_j)$
 
 The receivers have to be synchronized for DoA-estimation, because
 <br>
 $$\mathcal{F} \{ r(t-\tau) \}=\mathcal{F} \{ r(t) \}*e^{-j\omega \tau}$$
 <br>
+
+## Packet Detection 
+The detection of incoming packets can be computed by using a auto-correlation of the sampled signal, which is computed by [^3]: <br>
+
+$$\rho_{AC}[n]=<r[n], r[n+N_{STF}]>$$
+
+<br>$N_{STF}$ represents the number of samples of a single OFDM-symbol, depending on the used sampling-rate.
+r[n] is defined as a row-vector, containing $N_{STF}$ samples, starting from sample n:<br>
+
+$$r[n]= [r(n*T_s), ..., r(n*T_s+N_{STF}-1)]$$
+
 ### References
 [^1]: Zheng Yang, Yi Zhang, Guoxuan Chi, Guidong Zhang, "Hands-on Wireless Sensing with Wi-Fi: A Tutorial" tns.thss.tsinghua.edu.cn, 2023, https://tns.thss.tsinghua.edu.cn/wst/docs/pre/
 (accessed April 4, 2025)
 
 [^2]: "IEEE Standard for Information technology--Telecommunications and information exchange between systems Local and metropolitan area networks--Specific requirements Part 11: Wireless LAN Medium Access Control (MAC) and Physical Layer (PHY) Specifications," in IEEE Std 802.11-2012 (Revision of IEEE Std 802.11-2007) , vol., no., pp.1-2793, 29 March 2012, doi: 10.1109/IEEESTD.2012.6178212.
+
+[^3]: Lin, N., Yun, Z., Zhou, S., & Han, S. (2025). GR-WiFi: A GNU Radio based WiFi Platform with Single-User and Multi-User MIMO Capability. ArXiv, abs/2501.06176.
