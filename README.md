@@ -51,7 +51,7 @@ $$H=\{ H(f_j)|j\in [1, J]|, J\in \mathbb{N} \}$$
 
 <br>
 
-### Estimation of CSI for OFDM-signals according to IEEE802.11n
+### Calculation of CSI for OFDM-signals according to IEEE802.11n
 WLAN-transmissions use orthogonal frequency division multiplexing and divide the 20MHz channel into 64 subcarriers and the 40MHz channel into 128 subcarriers ([^2], chapter 2.3.7, S.1691). The original serial datastream is divided into parallel streams, each with a lower transmission-rate. A single Symbol of a parallelized stream is called OFDM-symbol. 
 
 The IEEE 802.11n introduces the PLCP (physical layer convergence protocol), that adds a preamble and a PLCP-header to the PSDU (PLCP Service Data Unit). The composition of the whole PPDU (PLCP Protocol data unit) depends on the used transmision-mode (non-HT, mixed-HT and HT) (high-throughput) ([^2],  Figure 20-1, S.1682).
@@ -66,15 +66,24 @@ $$\mathcal{F} \{ r(t-\tau) \}=\mathcal{F} \{ r(t) \}*e^{-j\omega \tau}$$
 <br>
 
 ## Packet Detection 
-The detection of incoming packets can be computed by using a auto-correlation of the sampled signal, which is computed by [^3]: <br>
+The detection of incoming packets can be computed by using a auto-correlation of the sampled signal, to detect the repeating pattern of the L-STF (legacy short training field) [^3]: <br>
 
 $$\rho_{AC}[n]=<r[n], r[n+N_{STF}]>$$
 
-<br>$N_{STF}$ represents the number of samples of a single OFDM-symbol, depending on the used sampling-rate.
+<br>$N_{STF}$ represents the number of samples of a single OFDM-symbol of the short-training-field, depending on the used sampling-rate.
 r[n] is defined as a row-vector, containing $N_{STF}$ samples, starting from sample n:<br>
 
 $$r[n]= [r(n*T_s), ..., r(n*T_s+N_{STF}-1)]$$
 
+## Carrier Frequency Offset Correction 
+The local oscillator signal in the receiver is not synchronized with the transmitters oscillator. To reduce the resulting error, that manifests in a frequency-shift of the received signals spectrum, an correction based on the Maximum likelihood (ML) estimation is performed as described in [^3]:<br>
+
+$$\hat{\epsilon}_1=\frac{\angle \{ \sum_{l=0}^{L-1}[r[\hat{n}_1+l]r[\hat{n}_1+l+N_{STF}]^*  ] \}}{N_{STF}}$$ 
+
+The average phase-shift per sample is calculated by multiplying each complex sample within the range L by the conjugated sample at the same position within the OFDM-symbol of the following symbol. A single multiplication results in a phase of zero radians, if both phases are equal.  The total phase-shift is averaged over the samples of one OFDM-symbol of the STF.<br>
+
+The coarse compensated version of the vector starting at sample n $\tilde{r}[n]$ is calculated by phase-shifting [^3]: 
+$$\tilde{r}[n]=e^{-jn\hat{\epsilon}_1}r[n]$$
 ### References
 [^1]: Zheng Yang, Yi Zhang, Guoxuan Chi, Guidong Zhang, "Hands-on Wireless Sensing with Wi-Fi: A Tutorial" tns.thss.tsinghua.edu.cn, 2023, https://tns.thss.tsinghua.edu.cn/wst/docs/pre/
 (accessed April 4, 2025)
