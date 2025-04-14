@@ -60,7 +60,7 @@ class PowerTrigger {
          * @param sample_in Pointer to a 32-bit IQ sample (upper 16 bits = I-component, lower 16 bits = Q).
          * @return true if the current state is actively triggering, false otherwise.
          */
-        bool getTrigger(int32_t* sample_in);
+        bool GetTrigger(int32_t* sample_in);
 
         /**
          * @brief Reset the internal state of the power trigger logic.
@@ -70,35 +70,35 @@ class PowerTrigger {
          * After calling this method, the trigger logic will re-enter the initial S_SKIP state,
          * waiting to skip a predefined number of samples before evaluating new trigger conditions.
          */
-        void reset();
+        void Reset();
     
     private:
         /// @brief Power threshold to trigger signal detection (absolute I must exceed this).
-        uint16_t power_thres;
+        uint16_t power_thres_;
 
         /// @brief Number of low-power samples required to end a trigger condition.
-        uint16_t window_size;
+        uint16_t window_size_;
 
         /// @brief Number of initial samples to ignore after a configuration change.
-        uint32_t num_sample_to_skip;
+        uint32_t num_sample_to_skip_;
 
         /// @brief Current state of the trigger state machine (S_SKIP, S_IDLE, or S_PACKET).
-        uint8_t state;
+        uint8_t state_;
         
         /// @brief Flag indicating that trigger-related parameters were recently changed.
-        bool num_sample_changed;
+        bool num_sample_changed_;
 
         /// @brief Counter for the number of processed samples below th power-threshold
-        uint32_t sample_count;
+        uint32_t sample_count_;
 
         /// @brief Extracted in-phase component (I) from a 32-bit IQ-sample.
-        uint16_t input_i;   
+        uint16_t input_i_;   
 
         /// @brief Absolute value of the I-component, used for threshold comparison.
-        uint16_t abs_i;    
+        uint16_t abs_i_;    
 
         /// @brief Trigger flag: true if a trigger condition is currently active.
-        bool trigger; 
+        bool trigger_; 
 
 };
 
