@@ -1,9 +1,11 @@
 #include <correlation/delay_sample.h>
+#include <correlation/moving_avg.h>
 #include <gtest/gtest.h>
 
-// Test, if the DelaySample class correctly stores and retrieves delayed samples
 #define TESTCYCLES 100
 #define BUFFER_SIZE 3
+
+// Test, if the DelaySample class correctly stores and retrieves delayed samples
 TEST(DelaySampleTest, DelayWindowCorrectness) {
     // Create an instance of DelaySample with a delay size of 16
     DelaySample<int32_t, BUFFER_SIZE> delaySample;
@@ -26,4 +28,101 @@ TEST(DelaySampleTest, DelayWindowCorrectness) {
         uint32_t delaySampleValue = delaySample.get();
         EXPECT_EQ(delaySampleValue, expected_sample) << "Delayed sample is incorrect at index " << i;
         }
+}
+
+// Test, if the MovingAverage class correctly calculates the moving average for int32_t samples
+TEST(MovingAverageTest, MovingAvgInt) {
+    // Create an instance of MovingAverage 
+    MovingAverage<int32_t, 5> movingAvg;
+
+    // example samples 
+    int32_t samples[20] = {
+        -1024, 2031, 578, -4300, 1234,
+        6000, -3050, 0, 1450, -1250,
+        3000, 4200, -6000, 1700, 800,
+        -400, 1100, -1100, 2900, -2900
+    };
+
+    // expected moving average values (as int32_t)
+    int32_t expected_avgs[20] = {
+        -1024 / 5,                                  // Ø = -204.8
+        ( -1024 + 2031 ) / 5,                       // Ø = 201.4
+        ( -1024 + 2031 + 578 ) / 5,                 // Ø = 317
+        ( -1024 + 2031 + 578 - 4300 ) / 5,          // Ø = -543
+        ( -1024 + 2031 + 578 - 4300 + 1234 ) / 5,   // Ø = -296.2000
+        (2031 + 578 -4300 +1234 + 6000) / 5,        // Ø = 1108.6
+        (578 -4300 +1234 +6000 -3050) / 5,          // Ø = 92.4
+        (-4300 +1234 +6000 -3050 + 0) / 5,          // Ø = -23.2
+        (1234 +6000 -3050 + 0 +1450) / 5,           // Ø = 1126.8
+        (6000 -3050 + 0 +1450 -1250) / 5,           // Ø = 630
+        (-3050 + 0 +1450 -1250 + 3000) / 5,         // Ø = 30
+        (0 +1450 -1250 + 3000 + 4200) / 5,          // Ø = 1480
+        (1450 -1250 + 3000 + 4200 -6000) / 5,       // Ø = 280
+        (-1250 + 3000 + 4200 -6000 + 1700) / 5,     // Ø = 330
+        (3000 + 4200 -6000 + 1700 + 800) / 5,       // Ø = 740
+        (4200 -6000 + 1700 + 800 -400) / 5,         // Ø = 60
+        (-6000 + 1700 + 800 -400 + 1100) / 5,       // Ø = -560
+        (1700 + 800 -400 + 1100 -1100) / 5,         // Ø = 420
+        (800 -400 + 1100 -1100 + 2900) / 5,         // Ø = 660
+        (-400 + 1100 -1100 + 2900 -2900) / 5        // Ø = -80
+    };
+
+    // Push samples into the moving average
+    for (int i = 0; i < 20; ++i) {
+        // push index as sample into the moving average
+        movingAvg.calculate(samples[i]);
+
+        // get the moving average value
+        int32_t avg = movingAvg.avg();
+        EXPECT_EQ(avg, expected_avgs[i])<< "at sample " << i;
+    }
+}
+
+
+// Test, if the MovingAverage class correctly calculates the moving average for float samples
+TEST(MovingAverageTest, MovingAvgFloat) {
+    // Create an instance of MovingAverage 
+    MovingAverage<float, 5> movingAvg;
+
+    // example samples 
+    float samples[20] = {
+        -1024, 2031, 578, -4300, 1234,
+        6000, -3050, 0, 1450, -1250,
+        3000, 4200, -6000, 1700, 800,
+        -400, 1100, -1100, 2900, -2900
+    };
+
+    // expected moving average values (as float)
+    float expected_avgs[20] = {
+        -1024 / 5.0f,                                  // Ø = -204.8
+        ( -1024 + 2031 ) / 5.0f,                       // Ø = 201.4
+        ( -1024 + 2031 + 578 ) / 5.0f,                 // Ø = 317
+        ( -1024 + 2031 + 578 - 4300 ) / 5.0f,          // Ø = -543
+        ( -1024 + 2031 + 578 - 4300 + 1234 ) / 5.0f,   // Ø = -296.2000
+        (2031 + 578 -4300 +1234 + 6000) / 5.0f,        // Ø = 1108.6
+        (578 -4300 +1234 +6000 -3050) / 5.0f,          // Ø = 92.4
+        (-4300 +1234 +6000 -3050 + 0) / 5.0f,          // Ø = -23.2
+        (1234 +6000 -3050 + 0 +1450) / 5.0f,           // Ø = 1126.8
+        (6000 -3050 + 0 +1450 -1250) / 5.0f,           // Ø = 630
+        (-3050 + 0 +1450 -1250 + 3000) / 5.0f,         // Ø = 30
+        (0 +1450 -1250 + 3000 + 4200) / 5.0f,          // Ø = 1480
+        (1450 -1250 + 3000 + 4200 -6000) / 5.0f,       // Ø = 280
+        (-1250 + 3000 + 4200 -6000 + 1700) / 5.0f,     // Ø = 330
+        (3000 + 4200 -6000 + 1700 + 800) / 5.0f,       // Ø = 740
+        (4200 -6000 + 1700 + 800 -400) / 5.0f,         // Ø = 60
+        (-6000 + 1700 + 800 -400 + 1100) / 5.0f,       // Ø = -560
+        (1700 + 800 -400 + 1100 -1100) / 5.0f,         // Ø = 420
+        (800 -400 + 1100 -1100 + 2900) / 5.0f,         // Ø = 660
+        (-400 + 1100 -1100 + 2900 -2900) / 5.0f        // Ø = -80
+    };
+
+    // Push samples into the moving average
+    for (int i = 0; i < 20; ++i) {
+        // push index as sample into the moving average
+        movingAvg.calculate(samples[i]);
+
+        // get the moving average value
+        float avg = movingAvg.avg();
+        EXPECT_EQ(avg, expected_avgs[i])<< "at sample " << i;
+    }
 }
