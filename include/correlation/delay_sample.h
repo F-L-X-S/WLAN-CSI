@@ -32,9 +32,10 @@ class DelaySample {
          *
          * @param sample The sample to be pushed into the delay buffer.
          */
-        void push(sample_type sample) {
+        DelaySample &push(sample_type sample) {
             delay_buffer[delay_index] = sample;
             delay_index = (delay_index + 1) % buffer_size;
+            return *this;
         }
 
         /**
