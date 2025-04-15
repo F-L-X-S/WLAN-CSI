@@ -25,6 +25,8 @@ PowerTrigger::PowerTrigger(uint16_t power_thres, uint16_t window_size, uint32_t 
     power_thres_ = power_thres;
     window_size_ = window_size;
     num_sample_to_skip_ = num_sample_to_skip;
+    trigger_ = false;               
+    num_sample_changed_ = true;     // set to true, so that the trigger_ will skip the first samples after init
 };
 
 /**
@@ -55,7 +57,7 @@ bool PowerTrigger::GetTrigger(int32_t* sample_in){
     input_i_ = (*sample_in >> 16) & 0xFFFF;          // extract I-component from IQ-sample (bit 16 to 31)
     abs_i_ = (input_i_ < 0) ? -input_i_ : input_i_;     // convert negative values into positive 
 
-    // ignore samples after trigger_-parameter changed
+    // ignore samples after trigger-condition was changed
     if (num_sample_changed_){
         sample_count_ = 0;
         state_ = S_SKIP;
@@ -64,6 +66,8 @@ bool PowerTrigger::GetTrigger(int32_t* sample_in){
     // Switch between ignoring incoming sample (S_SKIP), 
     switch(state_){
         case S_SKIP: 
+        // reset flag indicating that the trigger-condition was changed
+        num_sample_changed_ = false;
         // ignore sample
             if(sample_count_ > num_sample_to_skip_){
                 // start looking for power-trigger_
@@ -72,20 +76,20 @@ bool PowerTrigger::GetTrigger(int32_t* sample_in){
                 // ignore sample
                 sample_count_++;
             };
-
+            break;
         case S_IDLE: 
         // trigger_ on any significant sample 
             if (abs_i_ > power_thres_){
-                trigger_ = 1;
+                trigger_ = true;
                 sample_count_ = 0;
                 state_ = S_PACKET;
             }
-
+            break;
         case S_PACKET: 
             if (abs_i_ < power_thres_) {
-                if (sample_count_ > window_size_) {
+                if (sample_count_ >= window_size_) {
                     // go back to idle after detecting specified number of low-power-samples in a row
-                    trigger_ = 0;
+                    trigger_ = false;
                     state_ = S_IDLE;
                 } else {
                     // increase counter for low-power-samples 
@@ -95,7 +99,15 @@ bool PowerTrigger::GetTrigger(int32_t* sample_in){
                 // don't start counting low-power-samples during active trigger_-condition 
                 sample_count_ = 0;
              }
+             break;
+        default:
+            // handle unexpected state_ values
+            state_ = S_SKIP; // reset to a known state_
+            break;
     };
+
+    // return the current trigger_ state
+    return trigger_;
 }
 
 /**
