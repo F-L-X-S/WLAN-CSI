@@ -21,10 +21,10 @@ PowerTrigger::PowerTrigger() {
  * @param window_size        Number of consecutive low-power samples required to deactivate the trigger_.
  * @param num_sample_to_skip_ Number of samples to skip before the trigger_ becomes active after configuration-change.
  */
-PowerTrigger::PowerTrigger(uint16_t power_thres_, uint16_t window_size, uint32_t num_sample_to_skip_){
-    power_thres_ = power_thres_;
+PowerTrigger::PowerTrigger(uint16_t power_thres, uint16_t window_size, uint32_t num_sample_to_skip){
+    power_thres_ = power_thres;
     window_size_ = window_size;
-    num_sample_to_skip_ = num_sample_to_skip_;
+    num_sample_to_skip_ = num_sample_to_skip;
 };
 
 /**
