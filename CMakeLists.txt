@@ -26,7 +26,7 @@ FetchContent_Declare(googletest URL https://github.com/google/googletest/archive
 FetchContent_MakeAvailable(googletest)
 enable_testing()
 
-# add test-executables
+# add test-executable power_trigger
 add_executable(power_trigger_test tests/power_trigger_test.cc)
 
 # link libraries to executable
@@ -36,6 +36,17 @@ target_link_libraries(
   GTest::gtest_main
 )
 
+# add test-executable correlation
+add_executable(correlation_test tests/correlation_test.cc)
+
+# link libraries to executable
+target_link_libraries(
+  correlation_test
+  GTest::gtest_main
+)
+
+
 include(GoogleTest)
 gtest_discover_tests(power_trigger_test)
+gtest_discover_tests(correlation_test)
 
