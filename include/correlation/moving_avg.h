@@ -16,12 +16,12 @@ class MovingAverage {
         /**
          * @brief Default constructor for `MovingAverage`.
          * 
-         * Initializes the moving average with a delay buffer of the specified size.
+         * Initializes the moving average with a delay buffer_ of the specified size.
          */
         MovingAverage &calculate(sample_type input) {
-            sum += input;
-            sum -= buffer.get();
-            buffer.push(input);
+            sum_ += input;
+            sum_ -= buffer_.get();
+            buffer_.push(input);
             return *this;
         }
 
@@ -29,26 +29,26 @@ class MovingAverage {
          * @brief Get the current moving average.
          * 
          * This function calculates the moving average based on the samples in the
-         * delay buffer.
+         * delay buffer_.
          *
          * @return The current moving average.
          */
-        sample_type avg() const { return sum / buffer_size; }
+        sample_type avg() const { return sum_ / buffer_size; }
 
     private:
         /**
-         * @brief The delay buffer.
+         * @brief The delay buffer_.
          * 
-         * This buffer stores the samples in a circular manner.
+         * This buffer_ stores the samples in a circular manner.
          */
-        DelaySample<sample_type, buffer_size> buffer;
+        DelaySample<sample_type, buffer_size> buffer_;
 
         /**
-         * @brief The sum of the samples in the delay buffer.
+         * @brief The sum_ of the samples in the delay buffer_.
          * 
-         * This variable stores the sum of the samples in the delay buffer.
+         * This variable stores the sum_ of the samples in the delay buffer_.
          */
-        sample_type sum = {};
+        sample_type sum_ = {};
 };
 
 #endif // MOVING_AVG_H

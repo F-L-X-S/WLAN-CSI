@@ -18,9 +18,9 @@ class DelaySample {
          * 
          * Initializes an empty delay buffer and sets the delay index to 0.
          */
-        DelaySample() : delay_index(0) {
+        DelaySample() : delay_index_(0) {
             for (int i = 0; i < buffer_size; ++i) {
-                delay_buffer[i] = 0;
+                delay_buffer_[i] = 0;
             }
         }
 
@@ -33,8 +33,8 @@ class DelaySample {
          * @param sample The sample to be pushed into the delay buffer.
          */
         DelaySample &push(sample_type sample) {
-            delay_buffer[delay_index] = sample;
-            delay_index = (delay_index + 1) % buffer_size;
+            delay_buffer_[delay_index_] = sample;
+            delay_index_ = (delay_index_ + 1) % buffer_size;
             return *this;
         }
 
@@ -47,8 +47,8 @@ class DelaySample {
          * @return The delayed sample.
          */
         sample_type get() const {
-            int index = (delay_index + buffer_size) % buffer_size;
-            return delay_buffer[index];
+            int index = (delay_index_ + buffer_size) % buffer_size;
+            return delay_buffer_[index];
         }
 
     private:
@@ -57,14 +57,14 @@ class DelaySample {
          * 
          * This buffer stores the samples in a circular manner.
          */
-        sample_type delay_buffer[buffer_size];
+        sample_type delay_buffer_[buffer_size];
 
         /**
          * @brief The index of the current position in the delay buffer.
          * 
          * This index is used to keep track of where to insert the next sample.
          */
-        int delay_index;
+        int delay_index_;
 };
 
 #endif // DELAY_SAMPLE_H
