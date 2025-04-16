@@ -1,4 +1,4 @@
-// Original verilog-code by Jinghao Shi (openofdm/verilog/power_trigger.v)
+// Original vlang-code by Jinghao Shi (openofdm/verilog/power_trigger.v)
 
 #ifndef POWER_TRIGGER_H
 #define POWER_TRIGGER_H
