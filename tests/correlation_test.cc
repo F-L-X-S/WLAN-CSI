@@ -70,7 +70,7 @@ TEST(MovingAverageTest, MovingAvgInt) {
     // Push samples into the moving average
     for (int i = 0; i < 20; ++i) {
         // push index as sample into the moving average
-        movingAvg.calculate(samples[i]);
+        movingAvg.push(samples[i]);
 
         // get the moving average value
         int32_t avg = movingAvg.avg();
@@ -119,7 +119,7 @@ TEST(MovingAverageTest, MovingAvgFloat) {
     // Push samples into the moving average
     for (int i = 0; i < 20; ++i) {
         // push index as sample into the moving average
-        movingAvg.calculate(samples[i]);
+        movingAvg.push(samples[i]);
 
         // get the moving average value
         float avg = movingAvg.avg();

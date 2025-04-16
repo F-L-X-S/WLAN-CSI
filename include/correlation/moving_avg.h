@@ -14,11 +14,10 @@ template <typename sample_type, int buffer_size>
 class MovingAverage {
     public:
         /**
-         * @brief Default constructor for `MovingAverage`.
+         * @brief Push a new sample into the `MovingAverage` buffer and refresh the sum.
          * 
-         * Initializes the moving average with a delay buffer_ of the specified size.
          */
-        MovingAverage &calculate(sample_type input) {
+        MovingAverage &push(sample_type input) {
             sum_ += input;
             sum_ -= buffer_.get();
             buffer_.push(input);
