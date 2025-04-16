@@ -5,11 +5,11 @@
  * 
  * Initializes an empty PowerTrigger object
  */
-PowerTrigger::PowerTrigger() {
-    power_thres_ = SR_POWER_THRES;
-    window_size_ = SR_POWER_WINDOW;
-    num_sample_to_skip_ = SR_SKIP_SAMPLE;
-}
+PowerTrigger::PowerTrigger(): 
+    power_thres_(SR_POWER_THRES), 
+    window_size_(SR_POWER_WINDOW), 
+    num_sample_to_skip_(SR_SKIP_SAMPLE)
+    {};
 
 /**
  * @brief Construct a new PowerTrigger object with custom trigger_ parameters.
@@ -21,13 +21,13 @@ PowerTrigger::PowerTrigger() {
  * @param window_size        Number of consecutive low-power samples required to deactivate the trigger_.
  * @param num_sample_to_skip_ Number of samples to skip before the trigger_ becomes active after configuration-change.
  */
-PowerTrigger::PowerTrigger(uint16_t power_thres, uint16_t window_size, uint32_t num_sample_to_skip){
-    power_thres_ = power_thres;
-    window_size_ = window_size;
-    num_sample_to_skip_ = num_sample_to_skip;
-    trigger_ = false;               
-    num_sample_changed_ = true;     // set to true, so that the trigger_ will skip the first samples after init
-};
+PowerTrigger::PowerTrigger(uint16_t power_thres, uint16_t window_size, uint32_t num_sample_to_skip):
+    power_thres_(power_thres),
+    window_size_(window_size),
+    num_sample_to_skip_(num_sample_to_skip),
+    trigger_(false),       
+    num_sample_changed_(true)    // set to true, so that the trigger_ will skip the first samples after init
+    {};
 
 /**
  * @brief Destroy the PowerTrigger object
