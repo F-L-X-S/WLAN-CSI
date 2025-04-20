@@ -2,16 +2,17 @@ cmake_minimum_required(VERSION 3.14)
 project(WLAN-CSI)
 
 # ---------- Main Application  ----------------
-include_directories(include)
-
-# include fetch-content function from CMake
-include(FetchContent)
-
 # GoogleTest requires at least C++14
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# libraries 
+# external packages
+include(FetchContent)
+include_directories(/opt/homebrew/opt/liquid-dsp/include) # edit this path to your liquid-dsp installation
+link_directories(/opt/homebrew/opt/liquid-dsp/lib)
+
+# internal libraries 
+include_directories(include)
 add_library(power_trigger_lib include/power_trigger/power_trigger.cc)
 
 # source files
@@ -23,9 +24,11 @@ set(SOURCE_FILES
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})  
 
 # link libraries to executable
+target_include_directories(${PROJECT_NAME} PRIVATE ${LIQUID_INCLUDE_DIRS})
 target_link_libraries(
   ${PROJECT_NAME} 
   power_trigger_lib
+  liquid
   )
 
 # ---------- Testing ----------------
