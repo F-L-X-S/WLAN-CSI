@@ -208,3 +208,6 @@ cython_debug/
 
 #synology 
 .DS_Store
+
+#vscode 
+settings.json
