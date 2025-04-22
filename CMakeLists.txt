@@ -1,7 +1,6 @@
 cmake_minimum_required(VERSION 3.14)
 project(WLAN-CSI)
 
-# ---------- Main Application  ----------------
 # GoogleTest requires at least C++14
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -15,13 +14,14 @@ link_directories(/opt/homebrew/opt/liquid-dsp/lib)
 include_directories(include)
 add_library(power_trigger_lib include/power_trigger/power_trigger.cc)
 
+# ---------- Main Application  ----------------
 # source files
-set(SOURCE_FILES
+set(MAIN_SRC_FILES
   src/main.cc
 )
 
-# executable
-add_executable(${PROJECT_NAME} ${SOURCE_FILES})  
+# executables
+add_executable(${PROJECT_NAME} ${MAIN_SRC_FILES})  
 
 # link libraries to executable
 target_include_directories(${PROJECT_NAME} PRIVATE ${LIQUID_INCLUDE_DIRS})
@@ -30,6 +30,30 @@ target_link_libraries(
   power_trigger_lib
   liquid
   )
+
+# ---------- Sandbox ----------------
+# Define source files
+set(SANDBOX_SRC_FILES
+  sandbox/example_symsync_get_tau.cc
+)
+
+# Iterate over each file in SOURCE_FILES
+foreach(SOURCE_FILE ${SANDBOX_SRC_FILES})
+  # Extract the filename without the directory and extension
+  get_filename_component(EXECUTABLE_NAME ${SOURCE_FILE} NAME_WE)
+
+  # Create an executable for each source file
+  add_executable(${EXECUTABLE_NAME} ${SOURCE_FILE})
+
+  # Link libraries to the executable
+  target_link_libraries(${EXECUTABLE_NAME}
+    power_trigger_lib
+    liquid
+  )
+
+  # Include directories for each executable
+  target_include_directories(${EXECUTABLE_NAME} PRIVATE ${LIQUID_INCLUDE_DIRS} include)
+endforeach()
 
 # ---------- Testing ----------------
 # include googletest-framework
