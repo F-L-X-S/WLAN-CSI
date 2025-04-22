@@ -13,6 +13,9 @@ link_directories(/opt/homebrew/opt/liquid-dsp/lib)
 # internal libraries 
 include_directories(include)
 add_library(power_trigger_lib include/power_trigger/power_trigger.cc)
+add_library(auto_corr_lib include/correlation/auto_corr.cc)
+target_link_libraries(auto_corr_lib liquid)
+
 
 # ---------- Main Application  ----------------
 # source files
@@ -24,10 +27,10 @@ set(MAIN_SRC_FILES
 add_executable(${PROJECT_NAME} ${MAIN_SRC_FILES})  
 
 # link libraries to executable
-target_include_directories(${PROJECT_NAME} PRIVATE ${LIQUID_INCLUDE_DIRS})
 target_link_libraries(
   ${PROJECT_NAME} 
   power_trigger_lib
+  auto_corr_lib
   liquid
   )
 
@@ -35,6 +38,7 @@ target_link_libraries(
 # Define source files
 set(SANDBOX_SRC_FILES
   sandbox/example_symsync_get_tau.cc
+  sandbox/example_auto_correlation.cc
 )
 
 # Iterate over each file in SOURCE_FILES
@@ -48,6 +52,7 @@ foreach(SOURCE_FILE ${SANDBOX_SRC_FILES})
   # Link libraries to the executable
   target_link_libraries(${EXECUTABLE_NAME}
     power_trigger_lib
+    auto_corr_lib
     liquid
   )
 
