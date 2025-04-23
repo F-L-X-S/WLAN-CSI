@@ -16,7 +16,7 @@ class AutoCorr {
          * 
          * Initializes an empty AutoCorr object.
          */
-        AutoCorr(uint32_t min_plateau, unsigned int delay);
+        AutoCorr(float min_plateau, unsigned int delay);
 
         /**
          * @brief Destroy the AutoCorr object
@@ -46,7 +46,7 @@ class AutoCorr {
          *
          * @param min_plateu plateau detection threshold
          */
-        AutoCorr &SetMinPlateau(uint32_t min_plateau);
+        AutoCorr &SetMinPlateau(float min_plateau);
 
         /**
          * @brief Get the Inidcator, if a plateau was detected.

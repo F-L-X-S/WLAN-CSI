@@ -5,9 +5,9 @@
  * 
  * Initializes an empty AutoCorr object.
  */
-AutoCorr::AutoCorr(uint32_t min_plateau, unsigned int delay): 
+AutoCorr::AutoCorr(float min_plateau, unsigned int delay): 
     min_plateau_(min_plateau),
-    corr_(autocorr_cccf_create(1, delay)){};
+    corr_(autocorr_cccf_create(delay, delay)){};
 
 /**
  * @brief Destroy the AutoCorr object
@@ -51,7 +51,7 @@ AutoCorr& AutoCorr::Reset(){
  *
  * @param min_plateu plateau detection threshold
  */
-AutoCorr& AutoCorr::SetMinPlateau(uint32_t min_plateau){
+AutoCorr& AutoCorr::SetMinPlateau(float min_plateau){
     Reset();
     min_plateau_ = min_plateau;
     return *this;
