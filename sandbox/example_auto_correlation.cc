@@ -44,14 +44,23 @@ int main() {
     // Create sequence with 16 samples, repeated 10 times, and padded with noise
     unsigned int num_samples = 200;
     std::complex<float> x[num_samples]; // Array to hold the generated samples
-    GenerateSequence(16, 10, x, num_samples);
-    std::cout << "Generated samples:" << std::endl;
+    GenerateSequence(16, 4, x, num_samples);
+    // MATLAB-compatible output in terminal
+    std::cout << "x = [ ..." << std::endl;
+    std::cout << std::fixed;  
     for (unsigned int i = 0; i < num_samples; ++i) {
-        std::cout << x[i] << std::endl;
+        float re = x[i].real();
+        float im = x[i].imag();
+        std::cout << re << " + 1i*" << im;
+        if (i < num_samples - 1)
+            std::cout << ", ";
+        if ((i + 1) % 5 == 0)
+            std::cout << " ...\n";
     }
+    std::cout << "];" << std::endl;
 
     // Create an instance of AutoCorr with a delay of 16 samples
-    AutoCorr auto_corr(0.9, 16);
+    AutoCorr auto_corr(0.9f, 16);
     // Process the generated samples
     for (unsigned int i = 0; i < num_samples; ++i) {
         auto_corr.Push(x[i]);
