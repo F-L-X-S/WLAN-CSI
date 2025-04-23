@@ -26,7 +26,7 @@ void GenerateSequence(unsigned int sequence_len, unsigned int seq_repition, std:
     unsigned int t=0;
     for (unsigned int i=0; i<seq_repition; i++) {
         // copy sequence
-        memmove(&x[t], sequence, sequence_len*sizeof(float));
+        memmove(&x[t], sequence, sequence_len*sizeof(std::complex<float>));
         t += sequence_len;
     }
 
@@ -56,7 +56,7 @@ int main() {
     for (unsigned int i = 0; i < num_samples; ++i) {
         auto_corr.Push(x[i]);
         std::complex<float> rxx = auto_corr.GetRxx();
-        std::cout << "Auto-correlation value at sample " << i << ": " << std::abs(rxx) << std::endl;
+        std::cout << "Auto-correlation value at sample " << i << ":\t Abs:" << std::abs(rxx) <<" Arg:"<< std::arg(rxx) << "\tPlateau: "<< (auto_corr.PlateauDetected() ? "True":"False" )<<std::endl;
     }
     return 0;
 }
