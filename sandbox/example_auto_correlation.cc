@@ -9,11 +9,11 @@
 #include <correlation/auto_corr.h>
 
 // Generate a sequence of samples, containing a pattern of the length `sequence_len`, 
-// that is repeated 'seq_repition' times and followed by zeros. The sequence is padded with noise. 
+// that is repeated 'seq_repition' times and surrounded by zeros. The pattern starts at 'seq_start'. The sequence is padded with noise. 
 // https://github.com/jgaeddert/liquid-dsp/blob/master/examples/autocorr_cccf_example.c
-void GenerateSequence(unsigned int sequence_len, unsigned int seq_repition, std::complex<float>* x, unsigned int num_samples) {
+void GenerateSequence(unsigned int sequence_len, unsigned int seq_repition, unsigned int seq_start, std::complex<float>* x, unsigned int num_samples) {
     assert(num_samples >= sequence_len * seq_repition);
-    float SNRdB=20.0f;                              // signal-to-noise ratio (dB)
+    float SNRdB=20.0f;                             // signal-to-noise ratio (dB)
     std::complex<float> sequence[sequence_len];    // short sequence
 
     // generate random training sequence using QPSK symbols
@@ -22,17 +22,13 @@ void GenerateSequence(unsigned int sequence_len, unsigned int seq_repition, std:
         modemcf_modulate(mod, rand()%4, &sequence[i]);
     modemcf_destroy(mod);
 
-    // write training sequence 'seq_repition' times, followed by zeros
-    unsigned int t=0;
+    // write training sequence 'seq_repition' times in the middle of the array
+    unsigned int t=seq_start;
     for (unsigned int i=0; i<seq_repition; i++) {
         // copy sequence
         memmove(&x[t], sequence, sequence_len*sizeof(std::complex<float>));
         t += sequence_len;
     }
-
-    // pad end with zeros
-    for (unsigned int i=t; i<num_samples; i++)
-        x[i] = 0.0f;
 
     // add noise
     float nstd = powf(10.0f, -SNRdB/20.0f);
@@ -41,10 +37,11 @@ void GenerateSequence(unsigned int sequence_len, unsigned int seq_repition, std:
 };
 
 int main() {
-    // Create sequence with 16 samples, repeated 10 times, and padded with noise
+    // Create sequence with 16 samples, repeated 10 times, starting after 30 Samples, padded with noise
     unsigned int num_samples = 200;
-    std::complex<float> x[num_samples]; // Array to hold the generated samples
-    GenerateSequence(16, 4, x, num_samples);
+    std::complex<float> x[num_samples]; 
+    GenerateSequence(16, 4, 30, x, num_samples);
+
     // MATLAB-compatible output in terminal
     std::cout << "x = [ ..." << std::endl;
     std::cout << std::fixed;  
@@ -60,12 +57,13 @@ int main() {
     std::cout << "];" << std::endl;
 
     // Create an instance of AutoCorr with a delay of 16 samples
-    AutoCorr auto_corr(0.9f, 16);
+    AutoCorr auto_corr(0.9f, 4);
     // Process the generated samples
     for (unsigned int i = 0; i < num_samples; ++i) {
         auto_corr.Push(x[i]);
         std::complex<float> rxx = auto_corr.GetRxx();
-        std::cout << "Auto-correlation value at sample " << i << ":\t Abs:" << std::abs(rxx) <<" Arg:"<< std::arg(rxx) << "\tPlateau: "<< (auto_corr.PlateauDetected() ? "True":"False" )<<std::endl;
+        std::cout << "Rxx(" << i << ")\t Abs:" << std::abs(rxx) <<" Arg:"<< std::arg(rxx) 
+        << "\tPlateau: "<< (auto_corr.PlateauDetected() ? "True":"False") << std::endl;
     }
     return 0;
 }
