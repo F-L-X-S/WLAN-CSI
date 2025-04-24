@@ -15,6 +15,8 @@ include_directories(include)
 add_library(power_trigger_lib include/power_trigger/power_trigger.cc)
 add_library(auto_corr_lib include/correlation/auto_corr.cc)
 target_link_libraries(auto_corr_lib liquid)
+add_library(signal_generator_lib include/signal_generator/signal_generator.cc)
+target_link_libraries(signal_generator_lib liquid)
 
 
 # ---------- Main Application  ----------------
@@ -53,6 +55,7 @@ foreach(SOURCE_FILE ${SANDBOX_SRC_FILES})
   target_link_libraries(${EXECUTABLE_NAME}
     power_trigger_lib
     auto_corr_lib
+    signal_generator_lib
     liquid
   )
 
