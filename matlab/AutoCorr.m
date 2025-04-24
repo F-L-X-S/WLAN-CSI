@@ -1,5 +1,5 @@
 % MATLAB Implementation of the liquid-dsp autocorr_cccf functions
-% Note that matlab indicates arrays starting at 1 (C/C++ starts at zero)
+% Note that matlab uses 1-based array-indices and C/C++ starts at zero
 
 function rxx_lag = AutoCorr(x, lag, window_size)   
     % intialize buffer for correlation of specific lag
@@ -27,23 +27,8 @@ function rxx_lag = AutoCorr(x, lag, window_size)
     end
     
     % Plot
-    plot(abs(rxx_lag));
-    title('Autocorrelation');
+    hPlot = plot(abs(rxx_lag));
+    title('Autocorrelation (Matlab)');
     xlabel('Sample');
     ylabel('|R_{xx}|');
 end
-
-% real-valued triangular signal
-x = [ ...
-1.000000 + 1i*0.000000, 2.000000 + 1i*0.000000, 3.000000 + 1i*0.000000, 4.000000 + 1i*0.000000, 5.000000 + 1i*0.000000,  ...
-5.000000 + 1i*0.000000, 4.000000 + 1i*0.000000, 3.000000 + 1i*0.000000, 2.000000 + 1i*0.000000, 1.000000 + 1i*0.000000 ...
-];
-
-% Window-size
-window_size = 3;  
-
-% lag (delay)
-lag = 3;
-
-% Calculate and plot the autocorrelation
-AutoCorr(x,lag, window_size);
