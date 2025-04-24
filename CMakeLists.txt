@@ -83,6 +83,7 @@ add_executable(correlation_test tests/correlation_test.cc)
 # link libraries to executable
 target_link_libraries(
   correlation_test
+  auto_corr_lib
   GTest::gtest_main
 )
 

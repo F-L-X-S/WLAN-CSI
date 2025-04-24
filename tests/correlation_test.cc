@@ -1,5 +1,7 @@
 #include <correlation/delay_sample.h>
 #include <correlation/moving_avg.h>
+#include <correlation/auto_corr.h>
+#include <liquid/liquid.h>
 #include <gtest/gtest.h>
 
 #define TESTCYCLES 100
@@ -126,3 +128,28 @@ TEST(MovingAverageTest, MovingAvgFloat) {
         EXPECT_EQ(avg, expected_avgs[i])<< "at sample " << i;
     }
 }
+
+// Test, if the AutoCorr class computes correct RXX for a simple real-valued triangular signal 
+TEST(AutoCorrelationTest, TriangularAutoCorr) {
+    // real-valued triangular signal
+    std::vector<std::complex<float>> x = {
+        {1, 0}, {2, 0}, {3, 0}, {4, 0}, {5, 0},
+        {5, 0}, {4, 0}, {3, 0}, {2, 0}, {1, 0}
+    };
+
+    // MATLAB-computed expected values
+    std::vector<float> expected_rxx = {
+        0.0f, 0.0f, 0.0f, 4.0f, 14.0f,
+        29.0f, 41.0f, 46.0f, 41.0f, 29.0f
+    };
+
+    // Create an instance of AutoCorr with a delay of 3 samples and a plateau threshold of 0.9
+    AutoCorr auto_corr(0.9f, 3);
+
+    // Process samples
+    for (unsigned int i = 0; i < x.size(); ++i) {
+        auto_corr.Push(x[i]);
+        std::complex<float> rxx = auto_corr.GetRxx();
+        EXPECT_EQ(std::abs(rxx), expected_rxx[i])<< "at sample " << i;
+    }
+};
