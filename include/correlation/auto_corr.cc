@@ -30,8 +30,6 @@ AutoCorr& AutoCorr::Push(std::complex<float> sample){
     autocorr_cccf_push(corr_, sample);
     // execute the autocorr-calculation
     autocorr_cccf_execute(corr_, &rxx_);
-    // normalize by energy 
-    rxx_ /= autocorr_cccf_get_energy(corr_);
     return *this;
 };
 
@@ -68,9 +66,9 @@ bool AutoCorr::PlateauDetected(){
 };
 
 /**
- * @brief Get the current normalized complex auto-correlation value.
+ * @brief Get the current unnormalized complex auto-correlation value.
  * 
- * @return The current normalized complex auto-correlation value.
+ * @return The current unnormalized complex auto-correlation value.
  */
 std::complex<float> AutoCorr::GetRxx(){
     return rxx_;
