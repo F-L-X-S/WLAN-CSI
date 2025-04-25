@@ -11,12 +11,22 @@
 #define SYMBOL_START 30
 
 int main() {
+
     // Create sequence with 'NUM_SAMPLES' samples in total
-    // Sequence contains 'SYMBOL_REPEATS' symbols, each of length 'SYMBOL_LENGTH'
-    // The repeating symbols start at position 'SYMBOL_START'
     unsigned int num_samples = NUM_SAMPLES;
     std::complex<float> x[num_samples]; 
-    GenerateSequence(SYMBOL_LENGTH, SYMBOL_REPEATS, SYMBOL_START, x, num_samples);
+
+    // Generate the training field containing 'SYMBOL_REPEATS' symbols, each of length 'SYMBOL_LENGTH'
+    unsigned int tf_len = SYMBOL_LENGTH * SYMBOL_REPEATS;
+    std::complex<float> tf[tf_len]; 
+    GenerateRepeatingSequence(SYMBOL_LENGTH, SYMBOL_REPEATS, tf, LIQUID_MODEM_QPSK);
+
+    // Insert the training field into the longer sequence at the specified start position 'SYMBOL_START'
+    InsertSequence(x, tf, SYMBOL_START, tf_len);
+
+    // Add noise to the sequence
+    float SNRdB = 20.0f; // signal-to-noise ratio (dB)
+    AddNoise(x, num_samples, SNRdB);
 
     // Create an instance of AutoCorr, use a delay of SYMBOL_LENGTH to detect the plateau
     AutoCorr auto_corr(0.9f, SYMBOL_LENGTH);

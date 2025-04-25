@@ -3,38 +3,56 @@
 #include <cmath>
 #include <cstdlib>
 #include <cassert>
-#include <liquid/liquid.h>
+
 
 /**
- * @brief Generate a sequence of samples, containing a pattern of the length `sequence_len`, 
- *        that is repeated 'seq_repition' times and surrounded by zeros. The pattern starts at 'seq_start'. The sequence is padded with noise. 
- * @param sequence_len Length of the sequence to be generated.
- * @param seq_repition Number of repetitions of the sequence.
- * @param seq_start Starting index for the sequence in the output array.
+ * @brief Generate a sequence of samples, containing a repeating pattern of the length `symbol_len`, 
+ *        that is repeated 'symbol_repetitions' times. 
+ * @param symbol_len Length (Number of samples) of each symbol.
+ * @param seq_repition Number of repetitions of the symbols in the sequence.
  * @param x Pointer to the output array where the generated sequence will be stored.
- * @param num_samples Total number of samples in the output array.
+ * @param mod_type Modulation type for the symbols.
  */
-void GenerateSequence(unsigned int sequence_len, unsigned int seq_repition, unsigned int seq_start, std::complex<float>* x, unsigned int num_samples) {
-    assert(num_samples >= sequence_len * seq_repition);
-    float SNRdB=20.0f;                             // signal-to-noise ratio (dB)
-    std::complex<float> sequence[sequence_len];    // short sequence
-
-    // generate random training sequence using QPSK symbols
-    modemcf mod = modemcf_create(LIQUID_MODEM_QPSK);
-    for (unsigned int i=0; i<sequence_len; i++)
-        modemcf_modulate(mod, rand()%4, &sequence[i]);
+void GenerateRepeatingSequence(unsigned int symbol_len, unsigned int symbol_repetitions, std::complex<float>* x, modulation_scheme mod_type) {
+    // Create a symbol 
+    std::complex<float> symbol[symbol_len];  
+    modemcf mod = modemcf_create(mod_type);
+    for (unsigned int i=0; i<symbol_len; i++)
+        modemcf_modulate(mod, rand()%4, &symbol[i]);
     modemcf_destroy(mod);
 
-    // write training sequence 'seq_repition' times in the middle of the array
-    unsigned int t=seq_start;
-    for (unsigned int i=0; i<seq_repition; i++) {
-        // copy sequence
-        memmove(&x[t], sequence, sequence_len*sizeof(std::complex<float>));
-        t += sequence_len;
+    // Insert repeating symbol into output array
+    unsigned int t=0;
+    for (unsigned int i=0; i<symbol_repetitions; i++) {
+        // copy symbol-samples 
+        memmove(&x[t], symbol, symbol_len*sizeof(std::complex<float>));
+        t += symbol_len;
     }
+};
 
-    // add noise
+/**
+ * @brief Insert the short sequence into the long sequence at the specified start position
+ * 
+ * @param long_sequence Pointer to longer sequence 
+ * @param short_sequence Pointer to shorter sequence 
+ * @param seq_start Startng-position in the longer sequence where the shorter sequence will be inserted
+ * @param seq_len Length of the shorter sequence
+ */
+void InsertSequence(std::complex<float>* long_sequence, std::complex<float>* short_sequence, unsigned int seq_start, unsigned int seq_len) {
+    for (unsigned int i=0; i<seq_len; i++)
+        long_sequence[seq_start+i] = short_sequence[i];
+};
+
+
+/**
+ * @brief Add noise to a sequence of complex samples.
+ * 
+ * @param sequence Pointer to the sequence of complex samples.
+ * @param sequence_len Length of the sequence.
+ * @param SNRdB Signal-to-noise ratio in decibels.
+ */
+void AddNoise(std::complex<float>* sequence, unsigned int sequence_len, float SNRdB) {
     float nstd = powf(10.0f, -SNRdB/20.0f);
-    for (unsigned int i=0; i<num_samples; i++)
-        cawgn(&x[i],nstd);
+    for (unsigned int i=0; i<sequence_len; i++)
+        cawgn(&sequence[i],nstd);
 };
