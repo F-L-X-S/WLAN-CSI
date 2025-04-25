@@ -5,14 +5,21 @@
 #include <correlation/auto_corr.h>
 #include <signal_generator/signal_generator.h>
 
-int main() {
-    // Create sequence with 16 samples, repeated 10 times, starting after 30 Samples, padded with noise
-    unsigned int num_samples = 200;
-    std::complex<float> x[num_samples]; 
-    GenerateSequence(16, 4, 30, x, num_samples);
+#define NUM_SAMPLES 200
+#define SYMBOL_LENGTH 16
+#define SYMBOL_REPEATS 4
+#define SYMBOL_START 30
 
-    // Create an instance of AutoCorr with a delay of 16 samples
-    AutoCorr auto_corr(0.9f, 3);
+int main() {
+    // Create sequence with 'NUM_SAMPLES' samples in total
+    // Sequence contains 'SYMBOL_REPEATS' symbols, each of length 'SYMBOL_LENGTH'
+    // The repeating symbols start at position 'SYMBOL_START'
+    unsigned int num_samples = NUM_SAMPLES;
+    std::complex<float> x[num_samples]; 
+    GenerateSequence(SYMBOL_LENGTH, SYMBOL_REPEATS, SYMBOL_START, x, num_samples);
+
+    // Create an instance of AutoCorr, use a delay of SYMBOL_LENGTH to detect the plateau
+    AutoCorr auto_corr(0.9f, SYMBOL_LENGTH);
     // Buffer for autocorrealtion results
     std::complex<float> rxx_results[num_samples]; 
 
