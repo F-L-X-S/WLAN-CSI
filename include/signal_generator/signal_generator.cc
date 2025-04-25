@@ -31,6 +31,23 @@ void GenerateRepeatingSequence(unsigned int symbol_len, unsigned int symbol_repe
 };
 
 /**
+ * @brief Generate a sequence of samples by repeating a given pattern.
+ * 
+ * @param pattern Pointer to the symbol pattern (array of complex<float> values).
+ * @param pattern_len Number of samples in the symbol pattern.
+ * @param pattern_repetitions Number of times the pattern should be repeated.
+ * @param x Pointer to the output array where the generated sequence will be stored.
+ */
+void GenerateRepeatingSequence(std::complex<float>* pattern, unsigned int pattern_len, unsigned int symbol_repetitions, std::complex<float>* x) {
+    unsigned int t = 0;
+    for (unsigned int i = 0; i < symbol_repetitions; i++) {
+        memmove(&x[t], pattern, pattern_len * sizeof(std::complex<float>));
+        t += pattern_len;
+    }
+}
+
+
+/**
  * @brief Insert the short sequence into the long sequence at the specified start position
  * 
  * @param long_sequence Pointer to longer sequence 

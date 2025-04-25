@@ -1,5 +1,6 @@
 // https://github.com/jgaeddert/liquid-dsp/blob/master/examples/autocorr_cccf_example.c
-
+#ifndef SIGNAL_GENERATOR_H
+#define SIGNAL_GENERATOR_H
 #include <complex>
 #include <liquid/liquid.h>
 
@@ -12,6 +13,17 @@
  * @param mod_type Modulation type for the symbols.
  */
 void GenerateRepeatingSequence(unsigned int symbol_len, unsigned int symbol_repetitions, std::complex<float>* x, modulation_scheme mod_type);
+
+/**
+ * @brief Generate a sequence of samples by repeating a given symbol pattern.
+ * 
+ * @param symbol Pointer to the symbol pattern (array of complex<float> values).
+ * @param symbol_len Number of samples in the symbol pattern.
+ * @param symbol_repetitions Number of times the symbol pattern should be repeated.
+ * @param x Pointer to the output array where the generated sequence will be stored.
+ */
+void GenerateRepeatingSequence(std::complex<float>* symbol, unsigned int symbol_len, unsigned int symbol_repetitions, std::complex<float>* x);
+  
 
 /**
  * @brief // Insert the short sequence into the long sequence at the specified start position
@@ -31,3 +43,5 @@ void InsertSequence(std::complex<float>* long_sequence, std::complex<float>* sho
  * @param SNRdB Signal-to-noise ratio in decibels.
  */
 void AddNoise(std::complex<float>* sequence, unsigned int sequence_len, float SNRdB);
+
+#endif // SIGNAL_GENERATOR_H
