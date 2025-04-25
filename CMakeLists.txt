@@ -17,6 +17,7 @@ add_library(auto_corr_lib include/correlation/auto_corr.cc)
 target_link_libraries(auto_corr_lib liquid)
 add_library(signal_generator_lib include/signal_generator/signal_generator.cc)
 target_link_libraries(signal_generator_lib liquid)
+add_library(matlab_export_lib include/matlab_export/matlab_export.cc)
 
 
 # ---------- Main Application  ----------------
@@ -41,6 +42,7 @@ target_link_libraries(
 set(SANDBOX_SRC_FILES
   sandbox/example_symsync_get_tau.cc
   sandbox/example_auto_correlation.cc
+  sandbox/example_qdsync.cc
 )
 
 # Iterate over each file in SOURCE_FILES
@@ -56,6 +58,7 @@ foreach(SOURCE_FILE ${SANDBOX_SRC_FILES})
     power_trigger_lib
     auto_corr_lib
     signal_generator_lib
+    matlab_export_lib
     liquid
   )
 
