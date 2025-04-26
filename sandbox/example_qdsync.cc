@@ -19,15 +19,15 @@
 #include <signal_generator/signal_generator.h>
 #include <matlab_export/matlab_export.h>
 
-// Definition of the training-field (Pattern to be detected)
-#define TF_SYMBOL_LENGTH 16         // Number of Symbols a single training-field-symbol (pattern) contains
+// Definition of the training-field for 20MHz (Pattern to be detected) (Note, that a TF-Symbol means a pattern of QPSK-Symbols)
+#define TF_SYMBOL_LENGTH 1         // Number of Symbols a single training-field-symbol (pattern) contains (20MSPS)
 #define TF_SYMBOL_REPEAT 10         // Number of times the training-field-symbol (pattern) is repeated
 #define TF_SYMBOL_START 30          // Start position of the repeated training-field-symbols (pattern) in the sequence
 
 // Definition of the receiver-settings 
-#define SAMPLES_PER_SYMBOL 2        // samples/symbol (interpolation factor for the training-field)
+#define SAMPLES_PER_SYMBOL 16        // samples/symbol (interpolation factor for the training-field, note that 'symbol' means a single qpsk symbol, not a tf-symbol mentioned above)
 #define FILTER_DELAY 7              // filter delay [symbols] (number of symbols, the filter has to wait before taking the first median value)
-#define NUM_SAMPLES 400             // Total Number of samples to be generated 
+#define NUM_SAMPLES 800             // Total Number of samples to be generated 
 
 // Output file in MATLAB-format to store results
 #define OUTFILE "matlab/example_qdsync_out.m" 
@@ -88,8 +88,8 @@ int main() {
     qdsync_cccf sync = qdsync_cccf_create_linear(tf, tf_len, LIQUID_FIRFILT_ARKAISER, SAMPLES_PER_SYMBOL, FILTER_DELAY, 0.3f, callback, &buffer);
 
     for (unsigned int i = 0; i < NUM_SAMPLES; ++i) {
-        // Process synchronization for each single sample 
-        qdsync_cccf_execute(sync, &x[i], TF_SYMBOL_LENGTH);
+        // Process synchronization by symbol 
+        qdsync_cccf_execute(sync, &x[i], SAMPLES_PER_SYMBOL);
 
         // Get the results
         rxy_results[i] = qdsync_cccf_get_rxy(sync);
