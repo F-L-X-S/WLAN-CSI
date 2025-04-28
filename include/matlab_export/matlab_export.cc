@@ -42,7 +42,10 @@ void MatlabExport(const std::vector<std::complex<float>>& x, const std::string& 
   */
 void MatlabExport(const std::vector<float>& x, const std::string& varname, const std::string& outfile) {
     std::ofstream file(outfile, std::ios::app); 
-
+    if (!file) {
+        std::cerr << "Error: File stream not ready for writing: " << outfile << std::endl;
+        return;
+    }
     file << varname << " = [ ...\n";
     for (size_t i = 0; i < x.size(); ++i) {
         file << x[i];
