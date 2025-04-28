@@ -20,17 +20,23 @@
 #include <matlab_export/matlab_export.h>
 
 // Definition of the training-field for 20MHz (Pattern to be detected) (Note, that a TF-Symbol means a pattern of QPSK-Symbols)
-#define TF_SYMBOL_LENGTH 1         // Number of Symbols a single training-field-symbol (pattern) contains (20MSPS)
+#define TF_SYMBOL_LENGTH 1          // Number of Symbols a single training-field-symbol (pattern) contains (20MSPS)
 #define TF_SYMBOL_REPEAT 10         // Number of times the training-field-symbol (pattern) is repeated
 #define TF_SYMBOL_START 30          // Start position of the repeated training-field-symbols (pattern) in the sequence
 
 // Definition of the receiver-settings 
-#define SAMPLES_PER_SYMBOL 16        // samples/symbol (interpolation factor for the training-field, note that 'symbol' means a single qpsk symbol, not a tf-symbol mentioned above)
+#define SAMPLES_PER_SYMBOL 16       // samples/symbol (interpolation factor for the training-field, note that 'symbol' means a single qpsk symbol, not a tf-symbol mentioned above)
 #define FILTER_DELAY 7              // filter delay [symbols] (number of symbols, the filter has to wait before taking the first median value)
 #define NUM_SAMPLES 800             // Total Number of samples to be generated 
 
+// Definition of the channel impairments
+#define SNR_DB 37.0f                // Signal-to-noise ratio (dB)
+#define NOISE_FLOOR -92.0f          // Noise floor (dB)
+#define CFO 0.0f                    // Carrier frequency offset (radians per sample)
+#define PHASE_OFFSET 1.2f           // Phase offset (radians)
+
 // Output file in MATLAB-format to store results
-#define OUTFILE "matlab/example_qdsync_out.m" 
+#define OUTFILE "./matlab/example_qdsync_out.m" 
 
 
 // synchronization callback (return 0:continue, 1:reset)
@@ -38,15 +44,13 @@ int callback(std::complex<float>* _buf, unsigned int _buf_len, void* buffer){
     for (unsigned int i = 0; i < _buf_len; ++i) {
         static_cast<std::vector<std::complex<float>>*>(buffer)->push_back(_buf[i]);  
     }
-    return 0;
+    return 1;
 }
 
 int main() {
     // ---------------------- Signal Generation ----------------------
     // Check if the number of samples is sufficient to contain the interpolated training field
     assert(NUM_SAMPLES > TF_SYMBOL_START + (TF_SYMBOL_LENGTH * TF_SYMBOL_REPEAT)*SAMPLES_PER_SYMBOL); 
-    // Create sequence with 'NUM_SAMPLES' samples in total
-    std::complex<float> x[NUM_SAMPLES]; 
 
     // Generate a pattern of sqrt(1/2)*(1+j) (example symbol transmitted in S-STF)
     std::complex<float> pattern[TF_SYMBOL_LENGTH];
@@ -71,12 +75,19 @@ int main() {
         firinterp_crcf_execute(interp, tf[i], &tf_i[i*SAMPLES_PER_SYMBOL]);
     }
 
-    // Insert the interpolated training field into the longer sequence at the specified start position 'TF_SYMBOL_START'
-    InsertSequence(x, tf_i, TF_SYMBOL_START, tf_i_len);
+    // ------------------- Channel impairments ----------------------
+    // create channel and add impairments
+    channel_cccf channel = channel_cccf_create();
+    channel_cccf_add_awgn(channel, NOISE_FLOOR, SNR_DB);            // Add Noise 
+    channel_cccf_add_carrier_offset(channel, CFO, PHASE_OFFSET);    // Add Carrier Frequency Offset and Phase Offset
 
-    // Add noise to the sequence
-    float SNRdB = 20.0f; // signal-to-noise ratio (dB)
-    AddNoise(x, NUM_SAMPLES, SNRdB);
+    // Insert the interpolated training field into the longer sequence at the specified start position 'TF_SYMBOL_START' 
+    std::complex<float> tx[NUM_SAMPLES];                    // Buffer to store the transmitted signal (before channel impariments)     
+    InsertSequence(tx, tf_i, TF_SYMBOL_START, tf_i_len);
+
+    // apply channel to the generated signal
+    std::complex<float> rx[NUM_SAMPLES];                    // Buffer to store the received signal (after channel impairiments)                 
+    channel_cccf_execute_block(channel, tx, NUM_SAMPLES, rx);
 
     // ----------------- Synchronization ----------------------
     std::vector<std::complex<float>> buffer;        // Buffer to store detected symbols 
@@ -89,7 +100,7 @@ int main() {
 
     for (unsigned int i = 0; i < NUM_SAMPLES; ++i) {
         // Process synchronization by symbol 
-        qdsync_cccf_execute(sync, &x[i], SAMPLES_PER_SYMBOL);
+        qdsync_cccf_execute(sync, &rx[i], SAMPLES_PER_SYMBOL);
 
         // Get the results
         rxy_results[i] = qdsync_cccf_get_rxy(sync);
@@ -101,7 +112,7 @@ int main() {
     qdsync_cccf_destroy(sync);
 
     // ----------------- MATLAB-compatible output in terminal ----------------------
-    MatlabExport(std::vector<std::complex<float>>(x, x + NUM_SAMPLES), "x", OUTFILE);
+    MatlabExport(std::vector<std::complex<float>>(rx, rx + NUM_SAMPLES), "x", OUTFILE);
     MatlabExport(buffer, "buffer", OUTFILE);
     MatlabExport(std::vector<std::complex<float>>(rxy_results, rxy_results + NUM_SAMPLES), "rxy", OUTFILE);
     MatlabExport(std::vector<float>(tau_results, tau_results + NUM_SAMPLES), "tau", OUTFILE);
