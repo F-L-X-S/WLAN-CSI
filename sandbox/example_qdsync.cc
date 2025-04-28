@@ -48,7 +48,7 @@ int main() {
     // Create sequence with 'NUM_SAMPLES' samples in total
     std::complex<float> x[NUM_SAMPLES]; 
 
-    // Generate a pattern of sqrt(1/2)*(1+j) (example symbol transmitted in L-STF)
+    // Generate a pattern of sqrt(1/2)*(1+j) (example symbol transmitted in S-STF)
     std::complex<float> pattern[TF_SYMBOL_LENGTH];
     for (unsigned int i = 0; i < TF_SYMBOL_LENGTH; i++) {
         float re = 1 * M_SQRT1_2;
