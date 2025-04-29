@@ -58,3 +58,20 @@ void MatlabExport(const std::vector<float>& x, const std::string& varname, const
 
     file.close();
 }
+
+
+/**
+ * @brief Function to Export a string-formatted Matlab-command or script to to specified output file.
+ * 
+ * @param commandline 
+ * @param outfile 
+ */
+void MatlabExport(const std::string& commandline, const std::string& outfile){
+    std::ofstream file(outfile, std::ios::app); 
+    if (!file) {
+        std::cerr << "Error: File stream not ready for writing: " << outfile << std::endl;
+        return;
+    }
+    file << commandline << std::endl;
+    file.close();
+}

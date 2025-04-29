@@ -22,4 +22,12 @@
  */
 void MatlabExport(const std::vector<float>& x, const std::string& varname, const std::string& outfile);
 
+/**
+ * @brief Function to Export a string-formatted Matlab-command or script to to specified output file.
+ * 
+ * @param commandline 
+ * @param outfile 
+ */
+void MatlabExport(const std::string& commandline, const std::string& outfile);
+
 #endif // MATLAB_EXPORT_H

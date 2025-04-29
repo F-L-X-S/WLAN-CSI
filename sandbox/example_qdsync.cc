@@ -36,7 +36,7 @@
 #define PHASE_OFFSET 0.4189f        // Phase offset (radians) (e.g. for 20MHz (wavelength 15m) -> phaseshift of (1/15)*2PI per meter => 0.4189rad/m)
 
 // Output file in MATLAB-format to store results
-#define OUTFILE "./matlab/example_qdsync_out.m" 
+#define OUTFILE "./matlab/example_qdsync.m" 
 
 
 // synchronization callback (return 0:continue, 1:reset)
@@ -111,13 +111,34 @@ int main() {
     firinterp_crcf_destroy(interp);
     qdsync_cccf_destroy(sync);
 
-    // ----------------- MATLAB-compatible output in terminal ----------------------
+    // ----------------- MATLAB output ----------------------
+    MatlabExport("clear;", OUTFILE);
     MatlabExport(std::vector<std::complex<float>>(rx, rx + NUM_SAMPLES), "x", OUTFILE);
     MatlabExport(buffer, "buffer", OUTFILE);
     MatlabExport(std::vector<std::complex<float>>(rxy_results, rxy_results + NUM_SAMPLES), "rxy", OUTFILE);
     MatlabExport(std::vector<float>(tau_results, tau_results + NUM_SAMPLES), "tau", OUTFILE);
     MatlabExport(std::vector<float>(dphi_results, dphi_results + NUM_SAMPLES), "dphi", OUTFILE);
     MatlabExport(std::vector<float>(phi_results, phi_results + NUM_SAMPLES), "phi", OUTFILE);
+
+    MatlabExport("% Window-size for MATLAB-coputation\n window_size = 32;", OUTFILE);
+    MatlabExport("% lag (delay) for MATLAB-computation\n lag = 32;", OUTFILE);
+
+    MatlabExport("figure;subplot(3,1,1); plot(real(x)); hold on;"
+        "plot(imag(x)); title('Input-signal'), legend('Real', 'Imag');grid on;", OUTFILE);
+    MatlabExport("subplot(3,1,2); plot(abs(rxy)); xlabel('Sample'); ylabel('|R_{xx}|');" 
+        "title('Crosscorrelation (Liquid C++)'); grid on;", OUTFILE);
+    MatlabExport("subplot(3,1,3); AutoCorr(x,lag, window_size); xlabel('Sample'); ylabel('|R_{xx}|');" 
+        "title('Autocorrelation (Matlab)'); grid on;", OUTFILE);
+
+    MatlabExport("figure;subplot(2,1,1); plot(real(x)); hold on;  plot(imag(x));" 
+        "title('Input-signal'), legend('Real', 'Imag');grid on;", OUTFILE);
+    MatlabExport("subplot(2,1,2); plot(real(buffer), imag(buffer), '.', 'MarkerSize', 10);" 
+        "grid on; axis equal; xlabel('In-Phase'); ylabel('Quadrature');" 
+        "title('Detected Symbols'); axis([-1 1 -1 1]);", OUTFILE);
+
+    MatlabExport("figure; subplot(3,1,1); plot(phi); title('Phi'), ;grid on;", OUTFILE);
+    MatlabExport("subplot(3,1,2); plot(dphi); title('dPhi'), ;grid on;", OUTFILE);
+    MatlabExport("subplot(3,1,3); plot(tau); title('tau'), ;grid on;", OUTFILE);
     
     return 0;
 }

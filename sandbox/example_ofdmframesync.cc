@@ -25,7 +25,7 @@
 #define PHASE_OFFSET 0.4189f        // Phase offset (radians) (e.g. for 20MHz (wavelength 15m) -> phaseshift of (1/15)*2PI per meter => 0.4189rad/m)
  
 // Output file in MATLAB-format to store results
-#define OUTFILE "./matlab/example_ofdmframesync_out.m" 
+#define OUTFILE "./matlab/example_ofdmframesync.m" 
 
 
 // custom data type to pass to callback function
@@ -145,10 +145,20 @@ int main(int argc, char*argv[])
     ofdmframegen_destroy(fg);
     ofdmframesync_destroy(fs);
 
-    // ----------------- MATLAB-compatible output ----------------------
+    // ----------------- MATLAB output ----------------------
+    MatlabExport("clear;", OUTFILE);
     MatlabExport(std::vector<std::complex<float>>(rx, rx + NUM_SAMPLES), "x", OUTFILE);
     MatlabExport(cb_data.buffer, "buffer", OUTFILE);
     MatlabExport(cb_data.phi_results, "phi", OUTFILE);
-    
+
+    MatlabExport("subplot(2,1,1); plot(real(x)); hold on;  plot(imag(x));" 
+        "title('Input-signal'), legend('Real', 'Imag');grid on;", OUTFILE);
+
+    MatlabExport("subplot(2,1,2); plot(phi); title('Phi');grid on;", OUTFILE);
+
+    MatlabExport("figure; plot(real(buffer), imag(buffer), '.', 'MarkerSize', 10);" 
+        "grid on; axis equal; xlabel('In-Phase'); ylabel('Quadrature');" 
+        "title('Detected Symbols'); axis([-1 1 -1 1]);", OUTFILE);
+
     return 0;
 }
