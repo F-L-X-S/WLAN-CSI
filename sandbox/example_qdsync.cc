@@ -112,33 +112,33 @@ int main() {
     qdsync_cccf_destroy(sync);
 
     // ----------------- MATLAB output ----------------------
-    InitMatlabExport(OUTFILE);
-    MatlabExport(std::vector<std::complex<float>>(rx, rx + NUM_SAMPLES), "x", OUTFILE);
-    MatlabExport(buffer, "buffer", OUTFILE);
-    MatlabExport(std::vector<std::complex<float>>(rxy_results, rxy_results + NUM_SAMPLES), "rxy", OUTFILE);
-    MatlabExport(std::vector<float>(tau_results, tau_results + NUM_SAMPLES), "tau", OUTFILE);
-    MatlabExport(std::vector<float>(dphi_results, dphi_results + NUM_SAMPLES), "dphi", OUTFILE);
-    MatlabExport(std::vector<float>(phi_results, phi_results + NUM_SAMPLES), "phi", OUTFILE);
+    MatlabExport m_file(OUTFILE);
+    m_file.Add(std::vector<std::complex<float>>(rx, rx + NUM_SAMPLES), "x")
+    .Add(buffer, "buffer")
+    .Add(std::vector<std::complex<float>>(rxy_results, rxy_results + NUM_SAMPLES), "rxy")
+    .Add(std::vector<float>(tau_results, tau_results + NUM_SAMPLES), "tau")
+    .Add(std::vector<float>(dphi_results, dphi_results + NUM_SAMPLES), "dphi")
+    .Add(std::vector<float>(phi_results, phi_results + NUM_SAMPLES), "phi")
 
-    MatlabExport("% Window-size for MATLAB-coputation\n window_size = 32;", OUTFILE);
-    MatlabExport("% lag (delay) for MATLAB-computation\n lag = 32;", OUTFILE);
+    .Add("% Window-size for MATLAB-coputation\n window_size = 32;")
+    .Add("% lag (delay) for MATLAB-computation\n lag = 32;")
 
-    MatlabExport("figure;subplot(3,1,1); plot(real(x)); hold on;"
-        "plot(imag(x)); title('Input-signal'), legend('Real', 'Imag');grid on;", OUTFILE);
-    MatlabExport("subplot(3,1,2); plot(abs(rxy)); xlabel('Sample'); ylabel('|R_{xx}|');" 
-        "title('Crosscorrelation (Liquid C++)'); grid on;", OUTFILE);
-    MatlabExport("subplot(3,1,3); AutoCorr(x,lag, window_size); xlabel('Sample'); ylabel('|R_{xx}|');" 
-        "title('Autocorrelation (Matlab)'); grid on;", OUTFILE);
+    .Add("figure;subplot(3,1,1); plot(real(x)); hold on;"
+        "plot(imag(x)); title('Input-signal'), legend('Real', 'Imag');grid on;")
+    .Add("subplot(3,1,2); plot(abs(rxy)); xlabel('Sample'); ylabel('|R_{xx}|');" 
+        "title('Crosscorrelation (Liquid C++)'); grid on;")
+    .Add("subplot(3,1,3); AutoCorr(x,lag, window_size); xlabel('Sample'); ylabel('|R_{xx}|');" 
+        "title('Autocorrelation (Matlab)'); grid on;")
 
-    MatlabExport("figure;subplot(2,1,1); plot(real(x)); hold on;  plot(imag(x));" 
-        "title('Input-signal'), legend('Real', 'Imag');grid on;", OUTFILE);
-    MatlabExport("subplot(2,1,2); plot(real(buffer), imag(buffer), '.', 'MarkerSize', 10);" 
+    .Add("figure;subplot(2,1,1); plot(real(x)); hold on;  plot(imag(x));" 
+        "title('Input-signal'), legend('Real', 'Imag');grid on;")
+    .Add("subplot(2,1,2); plot(real(buffer), imag(buffer), '.', 'MarkerSize', 10);" 
         "grid on; axis equal; xlabel('In-Phase'); ylabel('Quadrature');" 
-        "title('Detected Symbols'); axis([-1 1 -1 1]);", OUTFILE);
+        "title('Detected Symbols'); axis([-1 1 -1 1]);")
 
-    MatlabExport("figure; subplot(3,1,1); plot(phi); title('Phi'), ;grid on;", OUTFILE);
-    MatlabExport("subplot(3,1,2); plot(dphi); title('dPhi'), ;grid on;", OUTFILE);
-    MatlabExport("subplot(3,1,3); plot(tau); title('tau'), ;grid on;", OUTFILE);
+    .Add("figure; subplot(3,1,1); plot(phi); title('Phi'), ;grid on;")
+    .Add("subplot(3,1,2); plot(dphi); title('dPhi'), ;grid on;")
+    .Add("subplot(3,1,3); plot(tau); title('tau'), ;grid on;");
     
     return 0;
 }

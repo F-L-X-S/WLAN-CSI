@@ -148,20 +148,20 @@ int main(int argc, char*argv[])
     ofdmframesync_destroy(fs);
 
     // ----------------- MATLAB output ----------------------
-    InitMatlabExport(OUTFILE);
-    MatlabExport(std::vector<std::complex<float>>(rx, rx + NUM_SAMPLES), "x", OUTFILE);
-    MatlabExport(cb_data.buffer, "buffer", OUTFILE);
-    MatlabExport(cb_data.cfo, "cfo", OUTFILE);
-    MatlabExport(cb_data.phi, "phi", OUTFILE);
+    MatlabExport m_file(OUTFILE);
+    m_file.Add(std::vector<std::complex<float>>(rx, rx + NUM_SAMPLES), "x")
+    .Add(cb_data.buffer, "buffer")
+    .Add(cb_data.cfo, "cfo")
+    .Add(cb_data.phi, "phi")
 
-    MatlabExport("subplot(3,1,1); plot(real(x)); hold on;  plot(imag(x));" 
-        "title('Input-signal'), legend('Real', 'Imag');grid on;", OUTFILE);
-    MatlabExport("subplot(3,1,2); plot(cfo); title('Carrier frequency offset');grid on;", OUTFILE);
-    MatlabExport("subplot(3,1,3); plot(phi); title('Phase Offset');grid on;", OUTFILE);
+    .Add("subplot(3,1,1); plot(real(x)); hold on;  plot(imag(x));" 
+        "title('Input-signal'), legend('Real', 'Imag');grid on;")
+    .Add("subplot(3,1,2); plot(cfo); title('Carrier frequency offset');grid on;")
+    .Add("subplot(3,1,3); plot(phi); title('Phase Offset');grid on;")
 
-    MatlabExport("figure; plot(real(buffer), imag(buffer), '.', 'MarkerSize', 10);" 
+    .Add("figure; plot(real(buffer), imag(buffer), '.', 'MarkerSize', 10);" 
         "grid on; axis equal; xlabel('In-Phase'); ylabel('Quadrature');" 
-        "title('Detected Symbols'); axis([-1 1 -1 1]);", OUTFILE);
+        "title('Detected Symbols'); axis([-1 1 -1 1]);");
 
     return 0;
 }
