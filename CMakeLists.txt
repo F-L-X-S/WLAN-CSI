@@ -43,6 +43,7 @@ set(SANDBOX_SRC_FILES
   sandbox/example_symsync_get_tau.cc
   sandbox/example_auto_correlation.cc
   sandbox/example_qdsync.cc
+  sandbox/example_ofdmframesync.cc
 )
 
 # Iterate over each file in SOURCE_FILES
