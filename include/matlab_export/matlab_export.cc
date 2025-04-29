@@ -4,6 +4,22 @@
 
 
  /**
+  * @brief Function to intialize a MATLAB file. The function clears the file.
+  * 
+  * @param outfile 
+  */
+ void InitMatlabExport(const std::string& outfile) {
+    std::ofstream file(outfile, std::ios::trunc);
+    if (!file) {
+        std::cerr << "Error: File stream not ready for writing: " << outfile << std::endl;
+        return;
+    }
+    file << "% Auto-generated MATLAB script\n";
+    file << "clear;\n";
+    file.close();
+}
+
+ /**
   * @brief Function to export a vector of complex numbers to a MATLAB file. The vector is
   * appended to the end of the file. The function takes the vector, a variable name, and the outputfile
   * 

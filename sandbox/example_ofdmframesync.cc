@@ -31,7 +31,8 @@
 // custom data type to pass to callback function
 struct callback_data {
     std::vector<std::complex<float>> buffer;        // Buffer to store detected symbols 
-    std::vector<std::complex<float>> phi_results;   // phase offset estimate results
+    std::vector<float> cfo;           // carrier frequency offsets estimated per sample 
+    std::vector<float> phi;           // phase offsets estimated per sample 
 };
 
 // callback function
@@ -139,6 +140,7 @@ int main(int argc, char*argv[])
     // Samplewise synchronization
     for (unsigned int i = 0; i < NUM_SAMPLES; ++i) {
         ofdmframesync_execute(fs,&rx[i], 1);
+        cb_data.cfo.push_back(ofdmframesync_get_cfo(fs)); // get the estimated CFO
     }
     
     // destroy objects
@@ -146,15 +148,16 @@ int main(int argc, char*argv[])
     ofdmframesync_destroy(fs);
 
     // ----------------- MATLAB output ----------------------
-    MatlabExport("clear;", OUTFILE);
+    InitMatlabExport(OUTFILE);
     MatlabExport(std::vector<std::complex<float>>(rx, rx + NUM_SAMPLES), "x", OUTFILE);
     MatlabExport(cb_data.buffer, "buffer", OUTFILE);
-    MatlabExport(cb_data.phi_results, "phi", OUTFILE);
+    MatlabExport(cb_data.cfo, "cfo", OUTFILE);
+    MatlabExport(cb_data.phi, "phi", OUTFILE);
 
-    MatlabExport("subplot(2,1,1); plot(real(x)); hold on;  plot(imag(x));" 
+    MatlabExport("subplot(3,1,1); plot(real(x)); hold on;  plot(imag(x));" 
         "title('Input-signal'), legend('Real', 'Imag');grid on;", OUTFILE);
-
-    MatlabExport("subplot(2,1,2); plot(phi); title('Phi');grid on;", OUTFILE);
+    MatlabExport("subplot(3,1,2); plot(cfo); title('Carrier frequency offset');grid on;", OUTFILE);
+    MatlabExport("subplot(3,1,3); plot(phi); title('Phase Offset');grid on;", OUTFILE);
 
     MatlabExport("figure; plot(real(buffer), imag(buffer), '.', 'MarkerSize', 10);" 
         "grid on; axis equal; xlabel('In-Phase'); ylabel('Quadrature');" 

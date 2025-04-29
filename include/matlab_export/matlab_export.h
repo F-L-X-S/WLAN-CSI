@@ -2,6 +2,13 @@
 #define MATLAB_EXPORT_H
 #include <complex>
 
+ /**
+  * @brief Function to intialize a MATLAB file. The function clears the file.
+  * 
+  * @param outfile 
+  */
+ void InitMatlabExport(const std::string& outfile);
+
 /**
  * @brief Function to export a vector of complex numbers to a MATLAB file. The vector is
  * appended to the end of the file. The function takes the vector, a variable name, and the outputfile

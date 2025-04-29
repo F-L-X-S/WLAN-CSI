@@ -112,7 +112,7 @@ int main() {
     qdsync_cccf_destroy(sync);
 
     // ----------------- MATLAB output ----------------------
-    MatlabExport("clear;", OUTFILE);
+    InitMatlabExport(OUTFILE);
     MatlabExport(std::vector<std::complex<float>>(rx, rx + NUM_SAMPLES), "x", OUTFILE);
     MatlabExport(buffer, "buffer", OUTFILE);
     MatlabExport(std::vector<std::complex<float>>(rxy_results, rxy_results + NUM_SAMPLES), "rxy", OUTFILE);
