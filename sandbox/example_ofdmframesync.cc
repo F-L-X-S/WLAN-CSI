@@ -1,6 +1,6 @@
 /**
  * @file example_ofdmframesync.cc
- * @brief 
+ * @brief This example demonstrates the usage of the OFDM frame synchronizer for a phase-shifted Frame.
  * 
  */
 
@@ -14,7 +14,7 @@
 
 // Definition of the transmission-settings 
 #define NUM_SAMPLES 1200            // Total Number of samples to be generated 
-#define SYMBOLS_PER_FRAME 5         // Number of data-symbols transmitted per frame
+#define SYMBOLS_PER_FRAME 3         // Number of data-ofdm-symbols transmitted per frame
 #define FRAME_START 30              // Start position of the ofdm-frame in the sequence
  
 
@@ -47,7 +47,8 @@ static int callback(std::complex<float>* _X, unsigned char * _p, unsigned int _M
             continue;
         static_cast<callback_data*>(_cb_data)->buffer.push_back(_X[i]);  
     }
-return 0;
+// Reset after returning the first symbol 
+return 1;
 }
 
 // main function
@@ -58,22 +59,19 @@ int main(int argc, char*argv[])
 
     // ---------------------- Signal Generation ----------------------
     // options
-    unsigned int M           = 64;      // number of subcarriers
-    unsigned int cp_len      = 60;      // cyclic prefix length
-    unsigned int taper_len   = 50;      // taper length
+    unsigned int M           = 64;      // number of subcarriers 
+    unsigned int cp_len      = 16;      // cyclic prefix length (800ns for 20MHz => 16 Sample)
+    unsigned int taper_len   = 4;       // window taper length 
 
     // derived values
     unsigned int frame_len   = M + cp_len;
-    unsigned int frame_samples = (3+SYMBOLS_PER_FRAME)*frame_len;
+    unsigned int frame_samples = (3+SYMBOLS_PER_FRAME)*frame_len; // S0a + S0b + S1 + data symbols
 
     // Check if the number of samples is sufficient to contain the frame
     assert(NUM_SAMPLES > frame_samples+FRAME_START); 
 
-    unsigned char p[M];                       // subcarrier allocation array
-    std::complex<float> X[M];                 // channelized symbols
-    std::complex<float> y[frame_samples];     // output time series
-
     // initialize subcarrier allocation
+    unsigned char p[M];                       // subcarrier allocation array
     ofdmframe_init_default_sctype(M, p);
 
     // create subcarrier notch in upper half of band
@@ -85,7 +83,9 @@ int main(int argc, char*argv[])
     // create frame generator
     ofdmframegen fg = ofdmframegen_create(M, cp_len, taper_len, p);
 
-    unsigned int n=0;
+    std::complex<float> y[frame_samples];     // output time series
+    std::complex<float> X[M];                 // channelized symbols
+    unsigned int n=0;                         // Sample number in time domains
 
     // write first S0 symbol
     ofdmframegen_write_S0a(fg, &y[n]);
@@ -107,9 +107,8 @@ int main(int argc, char*argv[])
             // ignore 'null' and 'pilot' subcarriers
             if (p[j] != OFDMFRAME_SCTYPE_DATA)
                 continue;
-            // QPSK
-            //X[j] = std::complex<float>((rand() % 2 ? -0.707f : 0.707f), (rand() % 2 ? -0.707f : 0.707f));
-            X[j] = std::complex<float>(0.707f, 0.707f);
+            // Radnom QPSK Symbols
+            X[j] = std::complex<float>((rand() % 2 ? -0.707f : 0.707f), (rand() % 2 ? -0.707f : 0.707f));
         }
 
         // generate OFDM symbol in the time domain
@@ -137,16 +136,16 @@ int main(int argc, char*argv[])
     // create frame synchronizer
     ofdmframesync fs = ofdmframesync_create(M, cp_len, taper_len, p, callback, (void*)&cb_data);
 
-    // for (unsigned int i = 0; i < NUM_SAMPLES; ++i) {
-    //     // Process synchronization by sample 
-        
-    // }
-    ofdmframesync_execute(fs,rx,NUM_SAMPLES);
+    // Samplewise synchronization
+    for (unsigned int i = 0; i < NUM_SAMPLES; ++i) {
+        ofdmframesync_execute(fs,&rx[i], 1);
+    }
+    
     // destroy objects
     ofdmframegen_destroy(fg);
     ofdmframesync_destroy(fs);
 
-    // ----------------- MATLAB-compatible output in terminal ----------------------
+    // ----------------- MATLAB-compatible output ----------------------
     MatlabExport(std::vector<std::complex<float>>(rx, rx + NUM_SAMPLES), "x", OUTFILE);
     MatlabExport(cb_data.buffer, "buffer", OUTFILE);
     MatlabExport(cb_data.phi_results, "phi", OUTFILE);
