@@ -24,7 +24,7 @@
 #define TF_SYMBOL_REPEAT 10         // Number of times the training-field-symbol (pattern) is repeated
 #define TF_SYMBOL_START 30          // Start position of the repeated training-field-symbols (pattern) in the sequence
 
-// Definition of the receiver-settings 
+// Definition of the transmission-settings 
 #define SAMPLES_PER_SYMBOL 16       // samples/symbol (interpolation factor for the training-field, note that 'symbol' means a single qpsk symbol, not a tf-symbol mentioned above)
 #define FILTER_DELAY 7              // filter delay [symbols] (number of symbols, the filter has to wait before taking the first median value)
 #define NUM_SAMPLES 800             // Total Number of samples to be generated 
@@ -33,7 +33,7 @@
 #define SNR_DB 37.0f                // Signal-to-noise ratio (dB)
 #define NOISE_FLOOR -92.0f          // Noise floor (dB)
 #define CFO 0.0f                    // Carrier frequency offset (radians per sample)
-#define PHASE_OFFSET 1.2f           // Phase offset (radians)
+#define PHASE_OFFSET 0.4189f        // Phase offset (radians) (e.g. for 20MHz (wavelength 15m) -> phaseshift of (1/15)*2PI per meter => 0.4189rad/m)
 
 // Output file in MATLAB-format to store results
 #define OUTFILE "./matlab/example_qdsync_out.m" 
