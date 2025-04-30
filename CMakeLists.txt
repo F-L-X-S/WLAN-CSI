@@ -7,8 +7,19 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # external packages
 include(FetchContent)
-include_directories(/opt/homebrew/opt/liquid-dsp/include) # edit this path to your liquid-dsp installation
-link_directories(/opt/homebrew/opt/liquid-dsp/lib)
+
+set(liquid_patch git apply ${CMAKE_CURRENT_SOURCE_DIR}/patch/liquid.patch)
+
+FetchContent_Declare(
+  liquid
+  GIT_REPOSITORY https://github.com/jgaeddert/liquid-dsp
+  GIT_TAG        582f135d
+  PATCH_COMMAND ${liquid_patch}
+)
+
+FetchContent_MakeAvailable(liquid)
+include_directories(${liquid_SOURCE_DIR}/include)
+link_directories(${liquid_SOURCE_DIR}/lib)
 
 # internal libraries 
 include_directories(include)
@@ -64,7 +75,8 @@ foreach(SOURCE_FILE ${SANDBOX_SRC_FILES})
   )
 
   # Include directories for each executable
-  target_include_directories(${EXECUTABLE_NAME} PRIVATE ${LIQUID_INCLUDE_DIRS} include)
+  #target_include_directories(${EXECUTABLE_NAME} PRIVATE ${liquid_SOURCE_DIR}/include)
+
 endforeach()
 
 # ---------- Testing ----------------

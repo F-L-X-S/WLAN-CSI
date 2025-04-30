@@ -2,7 +2,7 @@
 #ifndef SIGNAL_GENERATOR_H
 #define SIGNAL_GENERATOR_H
 #include <complex>
-#include <liquid/liquid.h>
+#include <liquid.h>
 
 /**
  * @brief Generate a sequence of samples, containing a repeating pattern of the length `symbol_len`, 

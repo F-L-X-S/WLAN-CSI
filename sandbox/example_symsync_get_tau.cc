@@ -2,7 +2,7 @@
 #include <complex>
 #include <vector>
 #include <cmath>
-#include <liquid/liquid.h>
+#include <liquid.h>
 
 int main() {
     // Symbol-synchronization Parameters

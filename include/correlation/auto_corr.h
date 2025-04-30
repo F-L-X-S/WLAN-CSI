@@ -1,7 +1,7 @@
 #ifndef AUTO_CORR_H
 #define AUTO_CORR_H
 #include <complex.h>
-#include <liquid/liquid.h>
+#include <liquid.h>
 
 /**
  * @brief Class for auto-correlation of samples.

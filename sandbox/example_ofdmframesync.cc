@@ -8,7 +8,7 @@
  #include <cmath>
  #include <complex>
  #include <cassert>
- #include <liquid/liquid.h>
+#include <liquid.h>
  #include <signal_generator/signal_generator.h>
  #include <matlab_export/matlab_export.h>
 
@@ -49,7 +49,7 @@ static int callback(std::complex<float>* _X, unsigned char * _p, unsigned int _M
         static_cast<callback_data*>(_cb_data)->buffer.push_back(_X[i]);  
     }
 // Reset after returning the first symbol 
-return 1;
+return 0;
 }
 
 // main function
@@ -141,6 +141,7 @@ int main(int argc, char*argv[])
     for (unsigned int i = 0; i < NUM_SAMPLES; ++i) {
         ofdmframesync_execute(fs,&rx[i], 1);
         cb_data.cfo.push_back(ofdmframesync_get_cfo(fs)); // get the estimated CFO
+        cb_data.phi.push_back(ofdmframesync_get_phi(fs)); // get the estimated Phase offset
     }
     
     // destroy objects

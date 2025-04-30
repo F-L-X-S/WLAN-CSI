@@ -1,7 +1,7 @@
 #include <correlation/delay_sample.h>
 #include <correlation/moving_avg.h>
 #include <correlation/auto_corr.h>
-#include <liquid/liquid.h>
+#include <liquid.h>
 #include <gtest/gtest.h>
 
 #define TESTCYCLES 100

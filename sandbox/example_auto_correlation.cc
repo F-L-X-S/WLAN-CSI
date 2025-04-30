@@ -1,7 +1,7 @@
 #include <iostream>
 #include <cmath>
 #include <complex>
-#include <liquid/liquid.h>
+#include <liquid.h>
 #include <correlation/auto_corr.h>
 #include <signal_generator/signal_generator.h>
 

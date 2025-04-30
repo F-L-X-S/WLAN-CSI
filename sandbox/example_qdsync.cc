@@ -14,7 +14,7 @@
 #include <cmath>
 #include <complex>
 #include <cassert>
-#include <liquid/liquid.h>
+#include <liquid.h>
 #include <correlation/auto_corr.h>
 #include <signal_generator/signal_generator.h>
 #include <matlab_export/matlab_export.h>
