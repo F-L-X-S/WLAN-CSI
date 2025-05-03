@@ -13,7 +13,7 @@ set(liquid_patch git apply ${CMAKE_CURRENT_SOURCE_DIR}/patch/liquid.patch)
 FetchContent_Declare(
   liquid
   GIT_REPOSITORY https://github.com/jgaeddert/liquid-dsp
-  GIT_TAG        582f135d
+  GIT_TAG        v1.7.0
   PATCH_COMMAND ${liquid_patch}
 )
 
