@@ -22,8 +22,9 @@
 #define SNR_DB 37.0f                // Signal-to-noise ratio (dB)
 #define NOISE_FLOOR -92.0f          // Noise floor (dB)
 #define CFO 0.0f                    // Carrier frequency offset (radians per sample)
-#define PHASE_OFFSET 0.4189f        // Phase offset (radians) (e.g. for 20MHz (wavelength 15m) -> phaseshift of (1/15)*2PI per meter => 0.4189rad/m)
- 
+#define PHASE_OFFSET 0.0            // Phase offset (radians) 
+#define DELAY 0.1f                  // Delay (samples)
+
 // Output file in MATLAB-format to store results
 #define OUTFILE "./matlab/example_ofdmframesync.m" 
 
@@ -123,13 +124,21 @@ int main(int argc, char*argv[])
     channel_cccf_add_awgn(channel, NOISE_FLOOR, SNR_DB);            // Add Noise 
     channel_cccf_add_carrier_offset(channel, CFO, PHASE_OFFSET);    // Add Carrier Frequency Offset and Phase Offset
 
+    // create delay object and set delay
+    unsigned int nmax       = 200;  // maximum delay
+    unsigned int m          =  12;  // filter semi-length
+    unsigned int npfb       =  10;  // fractional delay resolution
+    fdelay_crcf d = fdelay_crcf_create(nmax, m, npfb);
+    fdelay_crcf_set_delay(d, DELAY);
+
     // Insert the interpolated training field into the longer sequence at the specified start position 'TF_SYMBOL_START' 
     std::complex<float> tx[NUM_SAMPLES];                    // Buffer to store the transmitted signal (before channel impariments)     
     InsertSequence(tx, y, FRAME_START, n);
 
     // apply channel to the generated signal
-    std::complex<float> rx[NUM_SAMPLES];                    // Buffer to store the received signal (after channel impairiments)                 
-    channel_cccf_execute_block(channel, tx, NUM_SAMPLES, rx);
+    std::complex<float> rx[NUM_SAMPLES];                        // Buffer to store the received signal (after channel impairiments)   
+    fdelay_crcf_execute_block(d, tx, NUM_SAMPLES, rx);          // Delay the signal              
+    channel_cccf_execute_block(channel, rx, NUM_SAMPLES, rx);   // Apply channel impairments to the signal
 
     // ----------------- Synchronization ----------------------
     struct callback_data cb_data; // callback data
