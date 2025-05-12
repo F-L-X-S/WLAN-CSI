@@ -21,9 +21,9 @@
 // Definition of the channel impairments
 #define SNR_DB 37.0f                // Signal-to-noise ratio (dB)
 #define NOISE_FLOOR -92.0f          // Noise floor (dB)
-#define CFO 0.0f                    // Carrier frequency offset (radians per sample)
-#define PHASE_OFFSET 0.0            // Phase offset (radians) 
-#define DELAY 0.1f                  // Delay (samples)
+#define CFO 0.01f                    // Carrier frequency offset (radians per sample)
+#define PHASE_OFFSET 0.4            // Phase offset (radians) 
+#define DELAY 0.5f                  // Delay (samples)
 
 // Output file in MATLAB-format to store results
 #define OUTFILE "./matlab/example_ofdmframesync.m" 
@@ -170,7 +170,7 @@ int main(int argc, char*argv[])
     .Add(cb_data.cfo, "cfo")
     .Add(cb_data.cfr, "cfr")
 
-    .Add("subplot(4,1,1); plot(real(x)); hold on;  plot(imag(x));" 
+    .Add("figure; subplot(4,1,1); plot(real(x)); hold on;  plot(imag(x));" 
         "title('Input-signal'), legend('Real', 'Imag');grid on;")
     .Add("subplot(4,1,2); plot(cfo); title('Carrier frequency offset');grid on;")
     .Add("subplot(4,1,3); plot(abs(cfr)); title('Channel frequency response Gain');grid on;")
