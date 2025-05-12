@@ -16,64 +16,36 @@ index fad0497f..8e72cb34 100644
  option(BUILD_SANDBOX    "Set to ON to build sandbox programs"   OFF)
  option(BUILD_DOC        "Set to ON to build documentation"      OFF)
 diff --git a/include/liquid.h b/include/liquid.h
-index 3db82f8b..246bf0ec 100644
+index 3db82f8b..f6066a26 100644
 --- a/include/liquid.h
 +++ b/include/liquid.h
-@@ -9081,6 +9081,7 @@ int ofdmframesync_execute(ofdmframesync _q,
+@@ -9081,6 +9081,9 @@ int ofdmframesync_execute(ofdmframesync _q,
  // query methods
  float ofdmframesync_get_rssi(ofdmframesync _q); // received signal strength indication
  float ofdmframesync_get_cfo(ofdmframesync _q);  // carrier offset estimate
-+float ofdmframesync_get_phi(ofdmframesync _q);  // phase offset estimate
++void ofdmframesync_get_subcarrier_gain(ofdmframesync _q, 
++                            liquid_float_complex * _x,
++                            unsigned int _n); 
  
  // set methods
  int ofdmframesync_set_cfo(ofdmframesync _q, float _cfo);  // set carrier offset estimate
 diff --git a/src/multichannel/src/ofdmframesync.c b/src/multichannel/src/ofdmframesync.c
-index d15eeadc..4e39b199 100644
+index d15eeadc..08739391 100644
 --- a/src/multichannel/src/ofdmframesync.c
 +++ b/src/multichannel/src/ofdmframesync.c
-@@ -131,8 +131,9 @@ struct ofdmframesync_s {
-     // synchronizer objects
-     nco_crcf nco_rx;        // numerically-controlled oscillator
-     msequence ms_pilot;     // pilot sequence generator
--    float phi_prime;        // ...
-+    float phi_prime;        // pilot phase deviation 
-     float p1_prime;         // filtered pilot phase slope
-+    float phi_hat;          // phase offset estimate
- 
- #if OFDMFRAMESYNC_ENABLE_SQUELCH
-     // coarse signal detection
-@@ -379,6 +380,7 @@ int ofdmframesync_reset(ofdmframesync _q)
-     _q->s_hat_1 = 0.0f;
-     _q->phi_prime = 0.0f;
-     _q->p1_prime = 0.0f;
-+    _q->phi_hat = 0.0f;
- 
-     // set thresholds (increase for small number of subcarriers)
-     _q->plcp_detect_thresh = (_q->M > 44) ? 0.35f : 0.35f + 0.01f*(44 - _q->M);
-@@ -460,6 +462,12 @@ int ofdmframesync_set_cfo(ofdmframesync _q, float _cfo)
-     return nco_crcf_set_frequency(_q->nco_rx, _cfo);
+@@ -448,6 +448,15 @@ float ofdmframesync_get_rssi(ofdmframesync _q)
+     return -10.0f*log10(_q->g0);
  }
  
-+// get receiver phase offset estimate
-+float ofdmframesync_get_phi(ofdmframesync _q)
++// get receiver gain estimate
++void ofdmframesync_get_subcarrier_gain(ofdmframesync _q, 
++                            liquid_float_complex * _x,
++                            unsigned int _n)
 +{
-+    return _q->phi_hat;
-+}
++ for (unsigned int i=0; i<_n; i++)
++        _x[i] = _q->G[i];
++};
 +
- //
- // internal methods
- //
-@@ -1008,9 +1016,13 @@ int ofdmframesync_estimate_eqgain_poly(ofdmframesync _q,
-         freq = freq / (float)(_q->M);
-         float A     = polyf_val(p_abs, _order+1, freq);
-         float theta = polyf_val(p_arg, _order+1, freq);
-+        _q->phi_hat += theta;
-         _q->G[i] = (_q->p[i] == OFDMFRAME_SCTYPE_NULL) ? 0.0f : A * liquid_cexpjf(theta);
-     }
- 
-+    // Average phase offset
-+    _q->phi_hat /= _q->M;
-+
- #if 0
-     for (i=0; i<N; i++)
-         printf("x(%3u) = %12.8f; y_abs(%3u) = %12.8f; y_arg(%3u) = %12.8f;\n",
+ // get receiver carrier frequency offset estimate
+ float ofdmframesync_get_cfo(ofdmframesync _q)
+ {

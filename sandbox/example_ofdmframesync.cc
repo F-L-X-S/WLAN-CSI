@@ -32,8 +32,8 @@
 // custom data type to pass to callback function
 struct callback_data {
     std::vector<std::complex<float>> buffer;        // Buffer to store detected symbols 
-    std::vector<float> cfo;           // carrier frequency offsets estimated per sample 
-    std::vector<float> phi;           // phase offsets estimated per sample 
+    std::vector<float> cfo;                         // carrier frequency offsets estimated per sample 
+    std::vector<std::complex<float>> cfr;           // channel frequency response 
 };
 
 // callback function
@@ -128,8 +128,8 @@ int main(int argc, char*argv[])
     unsigned int nmax       = 200;  // maximum delay
     unsigned int m          =  12;  // filter semi-length
     unsigned int npfb       =  10;  // fractional delay resolution
-    fdelay_crcf d = fdelay_crcf_create(nmax, m, npfb);
-    fdelay_crcf_set_delay(d, DELAY);
+    fdelay_crcf fd = fdelay_crcf_create(nmax, m, npfb);
+    fdelay_crcf_set_delay(fd, DELAY);
 
     // Insert the interpolated training field into the longer sequence at the specified start position 'TF_SYMBOL_START' 
     std::complex<float> tx[NUM_SAMPLES];                    // Buffer to store the transmitted signal (before channel impariments)     
@@ -137,7 +137,7 @@ int main(int argc, char*argv[])
 
     // apply channel to the generated signal
     std::complex<float> rx[NUM_SAMPLES];                        // Buffer to store the received signal (after channel impairiments)   
-    fdelay_crcf_execute_block(d, tx, NUM_SAMPLES, rx);          // Delay the signal              
+    fdelay_crcf_execute_block(fd, tx, NUM_SAMPLES, rx);          // Delay the signal              
     channel_cccf_execute_block(channel, rx, NUM_SAMPLES, rx);   // Apply channel impairments to the signal
 
     // ----------------- Synchronization ----------------------
@@ -150,24 +150,31 @@ int main(int argc, char*argv[])
     for (unsigned int i = 0; i < NUM_SAMPLES; ++i) {
         ofdmframesync_execute(fs,&rx[i], 1);
         cb_data.cfo.push_back(ofdmframesync_get_cfo(fs)); // get the estimated CFO
-        cb_data.phi.push_back(ofdmframesync_get_phi(fs)); // get the estimated Phase offset
-    }
+
+        // Add gain of all subcarriers estimated in S1 after receiving the symbols
+        if (cb_data.buffer.size() && !cb_data.cfr.size()){
+            cb_data.cfr.resize(M);
+            ofdmframesync_get_subcarrier_gain(fs, &cb_data.cfr[0], M); 
+        };
+    };
     
     // destroy objects
     ofdmframegen_destroy(fg);
     ofdmframesync_destroy(fs);
+    fdelay_crcf_destroy(fd);
 
     // ----------------- MATLAB output ----------------------
     MatlabExport m_file(OUTFILE);
     m_file.Add(std::vector<std::complex<float>>(rx, rx + NUM_SAMPLES), "x")
     .Add(cb_data.buffer, "buffer")
     .Add(cb_data.cfo, "cfo")
-    .Add(cb_data.phi, "phi")
+    .Add(cb_data.cfr, "cfr")
 
-    .Add("subplot(3,1,1); plot(real(x)); hold on;  plot(imag(x));" 
+    .Add("subplot(4,1,1); plot(real(x)); hold on;  plot(imag(x));" 
         "title('Input-signal'), legend('Real', 'Imag');grid on;")
-    .Add("subplot(3,1,2); plot(cfo); title('Carrier frequency offset');grid on;")
-    .Add("subplot(3,1,3); plot(phi); title('Phase Offset');grid on;")
+    .Add("subplot(4,1,2); plot(cfo); title('Carrier frequency offset');grid on;")
+    .Add("subplot(4,1,3); plot(abs(cfr)); title('Channel frequency response Gain');grid on;")
+    .Add("subplot(4,1,4); plot(angle(cfr)); title('Channel frequency response Phase');grid on;")
 
     .Add("figure; plot(real(buffer), imag(buffer), '.', 'MarkerSize', 10);" 
         "grid on; axis equal; xlabel('In-Phase'); ylabel('Quadrature');" 
