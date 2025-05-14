@@ -26,7 +26,7 @@
 #define CFO 0.01f                   // Carrier frequency offset (radians per sample)
 #define PHASE_OFFSET 0.4            // Phase offset (radians) 
 #define DELAY 0.3f                  // Delay for the first channel (samples)
-#define DDELAY 0.1f                 // Differential Delay between receiving channels (samples)
+#define DDELAY 0.0f                 // Differential Delay between receiving channels (samples)
 
 // Output file in MATLAB-format to store results
 #define OUTFILE "./matlab/example_ofdm_multisync.m" 
@@ -121,11 +121,11 @@ int main(int argc, char*argv[])
     }
 
     // ------------------- Channel impairments ----------------------
-    // create channel and add impairments
+    // create channel object
     channel_cccf channel = channel_cccf_create();
     channel_cccf_add_carrier_offset(channel, CFO, PHASE_OFFSET);    // Add Carrier Frequency Offset and Phase Offset
 
-    // create delay object and set delay
+    // create delay object 
     unsigned int nmax       = 200;  // maximum delay
     unsigned int m          =  12;  // filter semi-length
     unsigned int npfb       =  10;  // fractional delay resolution
@@ -173,6 +173,9 @@ int main(int argc, char*argv[])
                 ms.GetCfr(j, &cb_data[j].cfr, M); 
             };
         };
+        
+        // Synchronize NCOs of all channels to the average NCO frequency and phase
+        ms.SynchronizeNcos();
     };
     
     // destroy objects

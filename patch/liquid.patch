@@ -16,35 +16,303 @@ index fad0497f..8e72cb34 100644
  option(BUILD_SANDBOX    "Set to ON to build sandbox programs"   OFF)
  option(BUILD_DOC        "Set to ON to build documentation"      OFF)
 diff --git a/include/liquid.h b/include/liquid.h
-index 3db82f8b..f6066a26 100644
+index 3db82f8b..8efaecee 100644
 --- a/include/liquid.h
 +++ b/include/liquid.h
-@@ -9081,6 +9081,9 @@ int ofdmframesync_execute(ofdmframesync _q,
- // query methods
- float ofdmframesync_get_rssi(ofdmframesync _q); // received signal strength indication
- float ofdmframesync_get_cfo(ofdmframesync _q);  // carrier offset estimate
-+void ofdmframesync_get_subcarrier_gain(ofdmframesync _q, 
+@@ -8965,132 +8965,6 @@ LIQUID_FIRPFBCHR_DEFINE_API(LIQUID_FIRPFBCHR_MANGLE_CRCF,
+                             liquid_float_complex)
+ 
+ 
+-
+-#define OFDMFRAME_SCTYPE_NULL   0
+-#define OFDMFRAME_SCTYPE_PILOT  1
+-#define OFDMFRAME_SCTYPE_DATA   2
+-
+-// initialize default subcarrier allocation
+-//  _M      :   number of subcarriers
+-//  _p      :   output subcarrier allocation array, [size: _M x 1]
+-int ofdmframe_init_default_sctype(unsigned int    _M,
+-                                  unsigned char * _p);
+-
+-// initialize default subcarrier allocation
+-//  _M      :   number of subcarriers
+-//  _f0     :   lower frequency band, _f0 in [-0.5,0.5]
+-//  _f1     :   upper frequency band, _f1 in [-0.5,0.5]
+-//  _p      :   output subcarrier allocation array, [size: _M x 1]
+-int ofdmframe_init_sctype_range(unsigned int    _M,
+-                                float           _f0,
+-                                float           _f1,
+-                                unsigned char * _p);
+-
+-// validate subcarrier type (count number of null, pilot, and data
+-// subcarriers in the allocation)
+-//  _p          :   subcarrier allocation array, [size: _M x 1]
+-//  _M          :   number of subcarriers
+-//  _M_null     :   output number of null subcarriers
+-//  _M_pilot    :   output number of pilot subcarriers
+-//  _M_data     :   output number of data subcarriers
+-int ofdmframe_validate_sctype(unsigned char * _p,
+-                              unsigned int _M,
+-                              unsigned int * _M_null,
+-                              unsigned int * _M_pilot,
+-                              unsigned int * _M_data);
+-
+-// print subcarrier allocation to screen
+-//  _p      :   output subcarrier allocation array, [size: _M x 1]
+-//  _M      :   number of subcarriers
+-int ofdmframe_print_sctype(unsigned char * _p,
+-                           unsigned int    _M);
+-
+-
+-//
+-// OFDM frame (symbol) generator
+-//
+-typedef struct ofdmframegen_s * ofdmframegen;
+-
+-// create OFDM framing generator object
+-//  _M          :   number of subcarriers, >10 typical
+-//  _cp_len     :   cyclic prefix length
+-//  _taper_len  :   taper length (OFDM symbol overlap)
+-//  _p          :   subcarrier allocation (null, pilot, data), [size: _M x 1]
+-ofdmframegen ofdmframegen_create(unsigned int    _M,
+-                                 unsigned int    _cp_len,
+-                                 unsigned int    _taper_len,
+-                                 unsigned char * _p);
+-
+-int ofdmframegen_destroy(ofdmframegen _q);
+-
+-int ofdmframegen_print(ofdmframegen _q);
+-
+-int ofdmframegen_reset(ofdmframegen _q);
+-
+-// write first S0 symbol
+-int ofdmframegen_write_S0a(ofdmframegen _q,
+-                           liquid_float_complex *_y);
+-
+-// write second S0 symbol
+-int ofdmframegen_write_S0b(ofdmframegen _q,
+-                           liquid_float_complex *_y);
+-
+-// write S1 symbol
+-int ofdmframegen_write_S1(ofdmframegen _q,
+-                          liquid_float_complex *_y);
+-
+-// write data symbol
+-int ofdmframegen_writesymbol(ofdmframegen _q,
+-                             liquid_float_complex * _x,
+-                             liquid_float_complex *_y);
+-
+-// write tail
+-int ofdmframegen_writetail(ofdmframegen _q,
+-                           liquid_float_complex * _x);
+-
+-//
+-// OFDM frame (symbol) synchronizer
+-//
+-typedef int (*ofdmframesync_callback)(liquid_float_complex * _y,
+-                                      unsigned char * _p,
+-                                      unsigned int _M,
+-                                      void * _userdata);
+-typedef struct ofdmframesync_s * ofdmframesync;
+-
+-// create OFDM framing synchronizer object
+-//  _M          :   number of subcarriers, >10 typical
+-//  _cp_len     :   cyclic prefix length
+-//  _taper_len  :   taper length (OFDM symbol overlap)
+-//  _p          :   subcarrier allocation (null, pilot, data), [size: _M x 1]
+-//  _callback   :   user-defined callback function
+-//  _userdata   :   user-defined data pointer
+-ofdmframesync ofdmframesync_create(unsigned int           _M,
+-                                   unsigned int           _cp_len,
+-                                   unsigned int           _taper_len,
+-                                   unsigned char *        _p,
+-                                   ofdmframesync_callback _callback,
+-                                   void *                 _userdata);
+-int ofdmframesync_destroy(ofdmframesync _q);
+-int ofdmframesync_print(ofdmframesync _q);
+-int ofdmframesync_reset(ofdmframesync _q);
+-int ofdmframesync_is_frame_open(ofdmframesync _q);
+-int ofdmframesync_execute(ofdmframesync _q,
+-                          liquid_float_complex * _x,
+-                          unsigned int _n);
+-
+-// query methods
+-float ofdmframesync_get_rssi(ofdmframesync _q); // received signal strength indication
+-float ofdmframesync_get_cfo(ofdmframesync _q);  // carrier offset estimate
+-
+-// set methods
+-int ofdmframesync_set_cfo(ofdmframesync _q, float _cfo);  // set carrier offset estimate
+-
+-// debugging
+-int ofdmframesync_debug_enable(ofdmframesync _q);
+-int ofdmframesync_debug_disable(ofdmframesync _q);
+-int ofdmframesync_debug_print(ofdmframesync _q, const char * _filename);
+-
+-
+ //
+ // MODULE : nco (numerically-controlled oscillator)
+ //
+@@ -9347,6 +9221,138 @@ void SYNTH(_despread_triple)(SYNTH() _q,                                    \
+ // Define synth APIs
+ LIQUID_SYNTH_DEFINE_API(SYNTH_MANGLE_FLOAT, float, liquid_float_complex)
+ 
++//
++// MODULE : ofdmframe (orthogonal frequency division multiplexing)
++//
++
++#define OFDMFRAME_SCTYPE_NULL   0
++#define OFDMFRAME_SCTYPE_PILOT  1
++#define OFDMFRAME_SCTYPE_DATA   2
++
++// initialize default subcarrier allocation
++//  _M      :   number of subcarriers
++//  _p      :   output subcarrier allocation array, [size: _M x 1]
++int ofdmframe_init_default_sctype(unsigned int    _M,
++                                  unsigned char * _p);
++
++// initialize default subcarrier allocation
++//  _M      :   number of subcarriers
++//  _f0     :   lower frequency band, _f0 in [-0.5,0.5]
++//  _f1     :   upper frequency band, _f1 in [-0.5,0.5]
++//  _p      :   output subcarrier allocation array, [size: _M x 1]
++int ofdmframe_init_sctype_range(unsigned int    _M,
++                                float           _f0,
++                                float           _f1,
++                                unsigned char * _p);
++
++// validate subcarrier type (count number of null, pilot, and data
++// subcarriers in the allocation)
++//  _p          :   subcarrier allocation array, [size: _M x 1]
++//  _M          :   number of subcarriers
++//  _M_null     :   output number of null subcarriers
++//  _M_pilot    :   output number of pilot subcarriers
++//  _M_data     :   output number of data subcarriers
++int ofdmframe_validate_sctype(unsigned char * _p,
++                              unsigned int _M,
++                              unsigned int * _M_null,
++                              unsigned int * _M_pilot,
++                              unsigned int * _M_data);
++
++// print subcarrier allocation to screen
++//  _p      :   output subcarrier allocation array, [size: _M x 1]
++//  _M      :   number of subcarriers
++int ofdmframe_print_sctype(unsigned char * _p,
++                           unsigned int    _M);
++
++
++//
++// OFDM frame (symbol) generator
++//
++typedef struct ofdmframegen_s * ofdmframegen;
++
++// create OFDM framing generator object
++//  _M          :   number of subcarriers, >10 typical
++//  _cp_len     :   cyclic prefix length
++//  _taper_len  :   taper length (OFDM symbol overlap)
++//  _p          :   subcarrier allocation (null, pilot, data), [size: _M x 1]
++ofdmframegen ofdmframegen_create(unsigned int    _M,
++                                 unsigned int    _cp_len,
++                                 unsigned int    _taper_len,
++                                 unsigned char * _p);
++
++int ofdmframegen_destroy(ofdmframegen _q);
++
++int ofdmframegen_print(ofdmframegen _q);
++
++int ofdmframegen_reset(ofdmframegen _q);
++
++// write first S0 symbol
++int ofdmframegen_write_S0a(ofdmframegen _q,
++                           liquid_float_complex *_y);
++
++// write second S0 symbol
++int ofdmframegen_write_S0b(ofdmframegen _q,
++                           liquid_float_complex *_y);
++
++// write S1 symbol
++int ofdmframegen_write_S1(ofdmframegen _q,
++                          liquid_float_complex *_y);
++
++// write data symbol
++int ofdmframegen_writesymbol(ofdmframegen _q,
++                             liquid_float_complex * _x,
++                             liquid_float_complex *_y);
++
++// write tail
++int ofdmframegen_writetail(ofdmframegen _q,
++                           liquid_float_complex * _x);
++
++//
++// OFDM frame (symbol) synchronizer
++//
++typedef int (*ofdmframesync_callback)(liquid_float_complex * _y,
++                                      unsigned char * _p,
++                                      unsigned int _M,
++                                      void * _userdata);
++typedef struct ofdmframesync_s * ofdmframesync;
++
++// create OFDM framing synchronizer object
++//  _M          :   number of subcarriers, >10 typical
++//  _cp_len     :   cyclic prefix length
++//  _taper_len  :   taper length (OFDM symbol overlap)
++//  _p          :   subcarrier allocation (null, pilot, data), [size: _M x 1]
++//  _callback   :   user-defined callback function
++//  _userdata   :   user-defined data pointer
++ofdmframesync ofdmframesync_create(unsigned int           _M,
++                                   unsigned int           _cp_len,
++                                   unsigned int           _taper_len,
++                                   unsigned char *        _p,
++                                   ofdmframesync_callback _callback,
++                                   void *                 _userdata);
++int ofdmframesync_destroy(ofdmframesync _q);
++int ofdmframesync_print(ofdmframesync _q);
++int ofdmframesync_reset(ofdmframesync _q);
++int ofdmframesync_is_frame_open(ofdmframesync _q);
++int ofdmframesync_execute(ofdmframesync _q,
++                          liquid_float_complex * _x,
++                          unsigned int _n);
++
++// query methods
++float ofdmframesync_get_rssi(ofdmframesync _q);     // received signal strength indication
++float ofdmframesync_get_cfo(ofdmframesync _q);      // carrier offset estimate
++void ofdmframesync_get_cfr(ofdmframesync _q, 
 +                            liquid_float_complex * _x,
 +                            unsigned int _n); 
++nco_crcf* ofdmframesync_get_nco(ofdmframesync _q);  // get nco object
++
++// set methods
++int ofdmframesync_set_cfo(ofdmframesync _q, float _cfo);  // set carrier offset estimate
++
++// debugging
++int ofdmframesync_debug_enable(ofdmframesync _q);
++int ofdmframesync_debug_disable(ofdmframesync _q);
++int ofdmframesync_debug_print(ofdmframesync _q, const char * _filename);
++
  
- // set methods
- int ofdmframesync_set_cfo(ofdmframesync _q, float _cfo);  // set carrier offset estimate
+ 
+ //
 diff --git a/src/multichannel/src/ofdmframesync.c b/src/multichannel/src/ofdmframesync.c
-index d15eeadc..08739391 100644
+index d15eeadc..e48ead1d 100644
 --- a/src/multichannel/src/ofdmframesync.c
 +++ b/src/multichannel/src/ofdmframesync.c
-@@ -448,6 +448,15 @@ float ofdmframesync_get_rssi(ofdmframesync _q)
+@@ -448,6 +448,21 @@ float ofdmframesync_get_rssi(ofdmframesync _q)
      return -10.0f*log10(_q->g0);
  }
  
-+// get receiver gain estimate
-+void ofdmframesync_get_subcarrier_gain(ofdmframesync _q, 
++// get cfr estimate
++void ofdmframesync_get_cfr(ofdmframesync _q, 
 +                            liquid_float_complex * _x,
 +                            unsigned int _n)
 +{
 + for (unsigned int i=0; i<_n; i++)
 +        _x[i] = _q->G[i];
 +};
++
++// Get NCO Object
++nco_crcf* ofdmframesync_get_nco(ofdmframesync _q)
++{
++    return &(_q->nco_rx);
++}
 +
  // get receiver carrier frequency offset estimate
  float ofdmframesync_get_cfo(ofdmframesync _q)
