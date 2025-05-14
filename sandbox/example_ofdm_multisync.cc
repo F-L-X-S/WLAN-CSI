@@ -8,7 +8,7 @@
  #include <cmath>
  #include <complex>
  #include <cassert>
-#include <liquid.h>
+ #include <liquid.h>
  #include <signal_generator/signal_generator.h>
  #include <matlab_export/matlab_export.h>
  #include <multisync/multisync.h>
@@ -17,14 +17,16 @@
 #define NUM_SAMPLES 1200            // Total Number of samples to be generated 
 #define SYMBOLS_PER_FRAME 3         // Number of data-ofdm-symbols transmitted per frame
 #define FRAME_START 30              // Start position of the ofdm-frame in the sequence
+#define NUM_CHANNELS 4              // Number of channels to be synchronized
  
 
 // Definition of the channel impairments
 #define SNR_DB 37.0f                // Signal-to-noise ratio (dB)
 #define NOISE_FLOOR -92.0f          // Noise floor (dB)
-#define CFO 0.01f                    // Carrier frequency offset (radians per sample)
+#define CFO 0.01f                   // Carrier frequency offset (radians per sample)
 #define PHASE_OFFSET 0.4            // Phase offset (radians) 
-#define DELAY 0.5f                  // Delay (samples)
+#define DELAY 0.3f                  // Delay for the first channel (samples)
+#define DDELAY 0.1f                 // Differential Delay between receiving channels (samples)
 
 // Output file in MATLAB-format to store results
 #define OUTFILE "./matlab/example_ofdm_multisync.m" 
@@ -121,7 +123,6 @@ int main(int argc, char*argv[])
     // ------------------- Channel impairments ----------------------
     // create channel and add impairments
     channel_cccf channel = channel_cccf_create();
-    channel_cccf_add_awgn(channel, NOISE_FLOOR, SNR_DB);            // Add Noise 
     channel_cccf_add_carrier_offset(channel, CFO, PHASE_OFFSET);    // Add Carrier Frequency Offset and Phase Offset
 
     // create delay object and set delay
@@ -129,39 +130,48 @@ int main(int argc, char*argv[])
     unsigned int m          =  12;  // filter semi-length
     unsigned int npfb       =  10;  // fractional delay resolution
     fdelay_crcf fd = fdelay_crcf_create(nmax, m, npfb);
-    fdelay_crcf_set_delay(fd, DELAY);
 
     // Insert the interpolated training field into the longer sequence at the specified start position 'TF_SYMBOL_START' 
     std::complex<float> tx[NUM_SAMPLES];                    // Buffer to store the transmitted signal (before channel impariments)     
     InsertSequence(tx, y, FRAME_START, n);
 
     // apply channel to the generated signal
-    fdelay_crcf_execute_block(fd, tx, NUM_SAMPLES, tx);         // Delay the signal              
-    channel_cccf_execute_block(channel, tx, NUM_SAMPLES, tx);   // Apply channel impairments to the signal
-
-    std::vector<std::complex<float>> rx(tx, tx + NUM_SAMPLES);           // Buffer to store the received signal
+    std::vector<std::vector<std::complex<float>>> rx(NUM_CHANNELS);                 // Buffer to store the received signal for each channel
+    for (unsigned int i = 0; i < NUM_CHANNELS; ++i) {
+        std::complex<float> rx_channel[NUM_SAMPLES];
+        fdelay_crcf_set_delay(fd, DELAY+i*DDELAY);                                  // Set the delay for each channel
+        channel_cccf_add_awgn(channel, NOISE_FLOOR, SNR_DB);                        // Set Noise for each channel
+        fdelay_crcf_execute_block(fd, tx, NUM_SAMPLES, rx_channel);                 // Delay the signal              
+        channel_cccf_execute_block(channel, rx_channel, NUM_SAMPLES, rx_channel);   // Apply channel impairments to the signal
+        rx[i].assign(rx_channel, rx_channel + NUM_SAMPLES);                         // Copy the received signal to the buffer for the respective channel
+    }
+    
     // ----------------- Synchronization ----------------------
-    unsigned int num_channels = 1;
-
     // callback data
-    struct callback_data cb_data[num_channels]; 
-    void* userdata[num_channels];
+    struct callback_data cb_data[NUM_CHANNELS]; 
+    void* userdata[NUM_CHANNELS];
 
     // Array of Pointers to CB-Data 
-    for (unsigned int i = 0; i < num_channels; ++i)
+    for (unsigned int i = 0; i < NUM_CHANNELS; ++i)
         userdata[i] = &cb_data[i];
-        
+
     // Create multi frame synchronizer
-    MultiSync<ofdmframesync> ms(num_channels, {M, cp_len, taper_len, p}, callback, userdata);
+    MultiSync<ofdmframesync> ms(NUM_CHANNELS, {M, cp_len, taper_len, p}, callback, userdata);
 
-    // Samplewise synchronization
+    // Samplewise synchronization of each channel
+    std::vector<std::complex<float>> rx_sample(1);  // create vector of size 1 containing the current sample
     for (unsigned int i = 0; i < NUM_SAMPLES; ++i) {
-        std::vector<std::complex<float>> rx_sample(1, rx[i]); // create vector of size 1
-        ms.Execute(0, &rx_sample);
+        for (unsigned int j = 0; j < NUM_CHANNELS; ++j){
+            // get the current sample of the channel
+            rx_sample[0]= rx[j][i];             
 
-        // Add gain of all subcarriers estimated in S1 after receiving the symbols
-        if (cb_data[0].buffer.size() && !cb_data[0].cfr.size()){
-            ms.GetCfr(0, &cb_data->cfr, M); 
+            // execute the respective synchronizer
+            ms.Execute(j, &rx_sample);
+
+            // Store the CFR of all channels (only once)
+            if (cb_data[j].buffer.size() && !cb_data[j].cfr.size()){
+                ms.GetCfr(j, &cb_data[j].cfr, M); 
+            };
         };
     };
     
@@ -169,20 +179,39 @@ int main(int argc, char*argv[])
     ofdmframegen_destroy(fg);
     fdelay_crcf_destroy(fd);
 
-    // // ----------------- MATLAB output ----------------------
+    // ----------------- MATLAB output ----------------------
     MatlabExport m_file(OUTFILE);
-    m_file.Add(rx, "x")
-    .Add(cb_data[0].buffer, "buffer")
-    .Add(cb_data[0].cfr, "cfr")
+    
+    // Export variables to MATLAB file
+    for (unsigned int ch = 0; ch < NUM_CHANNELS; ++ch) {
+        std::string ch_suffix = std::to_string(ch);
 
-    .Add("figure; subplot(4,1,1); plot(real(x)); hold on;  plot(imag(x));" 
-        "title('Input-signal'), legend('Real', 'Imag');grid on;")
-    .Add("subplot(4,1,3); plot(abs(cfr)); title('Channel frequency response Gain');grid on;")
-    .Add("subplot(4,1,4); plot(angle(cfr)); title('Channel frequency response Phase');grid on;")
+        m_file.Add(rx[ch], "x_" + ch_suffix)
+            .Add(cb_data[ch].buffer, "buffer_" + ch_suffix)
+            .Add(cb_data[ch].cfr, "cfr_" + ch_suffix);
+    }
 
-    .Add("figure; plot(real(buffer), imag(buffer), '.', 'MarkerSize', 10);" 
-        "grid on; axis equal; xlabel('In-Phase'); ylabel('Quadrature');" 
-        "title('Detected Symbols'); axis([-1 1 -1 1]);");
+    // Add plot-commands to the MATLAB file
+    for (unsigned int ch = 0; ch < NUM_CHANNELS; ++ch) {
+        std::string ch_suffix = std::to_string(ch);
+
+        m_file.Add(
+            "figure; "
+            "subplot(4,1,1); plot(real(x_" + ch_suffix + ")); hold on; plot(imag(x_" + ch_suffix + ")); "
+            "title('Input-Signal Kanal " + ch_suffix + "'); legend('Real', 'Imag'); grid on;"
+
+            "subplot(4,1,3); plot(abs(cfr_" + ch_suffix + ")); title('Channel Frequency Response Gain – Kanal " + ch_suffix + "'); grid on;"
+
+            "subplot(4,1,4); plot(angle(cfr_" + ch_suffix + ")); title('Channel Frequency Response Phase – Kanal " + ch_suffix + "'); grid on;"
+        );
+
+        m_file.Add(
+            "figure; "
+            "plot(real(buffer_" + ch_suffix + "), imag(buffer_" + ch_suffix + "), '.', 'MarkerSize', 10); "
+            "grid on; axis equal; xlabel('In-Phase'); ylabel('Quadrature'); "
+            "title('Detected Symbols Kanal " + ch_suffix + "'); axis([-1 1 -1 1]);"
+        );
+    }
 
     return 0;
 }
