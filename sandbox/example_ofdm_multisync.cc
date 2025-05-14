@@ -26,7 +26,7 @@
 #define CFO 0.01f                   // Carrier frequency offset (radians per sample)
 #define PHASE_OFFSET 0.4            // Phase offset (radians) 
 #define DELAY 0.3f                  // Delay for the first channel (samples)
-#define DDELAY 0.0f                 // Differential Delay between receiving channels (samples)
+#define DDELAY 0.03f                // Differential Delay between receiving channels (samples)
 
 // Output file in MATLAB-format to store results
 #define OUTFILE "./matlab/example_ofdm_multisync.m" 
@@ -121,9 +121,9 @@ int main(int argc, char*argv[])
     }
 
     // ------------------- Channel impairments ----------------------
-    // create channel object
-    channel_cccf channel = channel_cccf_create();
-    channel_cccf_add_carrier_offset(channel, CFO, PHASE_OFFSET);    // Add Carrier Frequency Offset and Phase Offset
+    // create base channel object
+    channel_cccf base_channel = channel_cccf_create();
+    channel_cccf_add_carrier_offset(base_channel, CFO, PHASE_OFFSET);    // Add Carrier Frequency Offset and Phase Offset
 
     // create delay object 
     unsigned int nmax       = 200;  // maximum delay
@@ -136,14 +136,21 @@ int main(int argc, char*argv[])
     InsertSequence(tx, y, FRAME_START, n);
 
     // apply channel to the generated signal
-    std::vector<std::vector<std::complex<float>>> rx(NUM_CHANNELS);                 // Buffer to store the received signal for each channel
+    std::vector<std::vector<std::complex<float>>> rx(NUM_CHANNELS);                 // Buffer to store the received signal for all channels
     for (unsigned int i = 0; i < NUM_CHANNELS; ++i) {
-        std::complex<float> rx_channel[NUM_SAMPLES];
-        fdelay_crcf_set_delay(fd, DELAY+i*DDELAY);                                  // Set the delay for each channel
+        std::complex<float> rx_channel[NUM_SAMPLES];                                // Buffer to store the received signal a single channel
+
+        // Add Time delay 
+        fdelay_crcf_set_delay(fd, DELAY+i*DDELAY);                                  // Set the delay for respective channel
+        fdelay_crcf_execute_block(fd, tx, NUM_SAMPLES, rx_channel);                 // Delay the signal    
+
+        // Add channel impairments
+        channel_cccf channel = channel_cccf_copy(base_channel);                     // Copy the base channel
         channel_cccf_add_awgn(channel, NOISE_FLOOR, SNR_DB);                        // Set Noise for each channel
-        fdelay_crcf_execute_block(fd, tx, NUM_SAMPLES, rx_channel);                 // Delay the signal              
-        channel_cccf_execute_block(channel, rx_channel, NUM_SAMPLES, rx_channel);   // Apply channel impairments to the signal
-        rx[i].assign(rx_channel, rx_channel + NUM_SAMPLES);                         // Copy the received signal to the buffer for the respective channel
+        channel_cccf_execute_block(channel, rx_channel, NUM_SAMPLES, rx_channel);   // Apply channel impairments to the signal          
+        
+        // Copy the received signal to the buffer for the respective channel
+        rx[i].assign(rx_channel, rx_channel + NUM_SAMPLES);                         
     }
     
     // ----------------- Synchronization ----------------------
