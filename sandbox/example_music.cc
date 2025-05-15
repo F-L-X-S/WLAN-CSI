@@ -172,6 +172,7 @@ int main(int argc, char*argv[])
 
     // initialize zmq socket for data export 
     ZmqSender sender("tcp://*:5555");
+    std::vector<std::vector<std::complex<float>>> cfr(NUM_CHANNELS);   // Multidimensional buffer to store the cfr for all channels
 
     // Samplewise synchronization of each channel
     std::vector<std::complex<float>> rx_sample(1);  // create vector of size 1 containing the current sample
@@ -185,14 +186,15 @@ int main(int argc, char*argv[])
 
             // Store the CFR of all channels (only once)
             if (cb_data[j].buffer.size() && !cb_data[j].cfr.size()){
-                ms.GetCfr(j, &cb_data[j].cfr, M);   // Write cfr to callback data
-                sender.send(cb_data[j].cfr);        // send the CFR to zmq socket
+                ms.GetCfr(j, &cb_data[j].cfr, M);                               // Write cfr to callback data
+                cfr[j].assign(cb_data[j].cfr.begin(), cb_data[j].cfr.end());    // Copy the CFR to the multidimensional buffer
             };
         };
         
         // Synchronize NCOs of all channels to the average NCO frequency and phase
         ms.SynchronizeNcos();
     };
+    sender.send(cfr);                                               // send the CFR to zmq socket
     
     // destroy objects
     ofdmframegen_destroy(fg);
