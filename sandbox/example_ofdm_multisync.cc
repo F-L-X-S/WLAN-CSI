@@ -1,6 +1,7 @@
 /**
- * @file example_ofdmframesync.cc
- * @brief This example demonstrates the usage of the OFDM frame synchronizer for a phase-shifted Frame.
+ * @file example_ofdm_multisync.cc
+ * @brief This example demonstrates the usage of multiple OFDM frame synchronizers ithin multisync 
+ * for receiving multiple channels with different channel impairments like in an antenna array.
  * 
  */
 
