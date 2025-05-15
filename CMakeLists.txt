@@ -8,6 +8,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # external packages
 include(FetchContent)
 
+# Liquid-DSP
 set(liquid_patch git apply ${CMAKE_CURRENT_SOURCE_DIR}/patch/liquid.patch)
 
 FetchContent_Declare(
@@ -21,15 +22,46 @@ FetchContent_MakeAvailable(liquid)
 include_directories(${liquid_SOURCE_DIR}/include)
 link_directories(${liquid_SOURCE_DIR}/lib)
 
-# internal libraries 
+
+# ZeroMQ
+# libzmq 
+FetchContent_Declare(
+  libzmq
+  GIT_REPOSITORY https://github.com/zeromq/libzmq.git
+  GIT_TAG v4.3.5  # oder eine andere stabile Version
+)
+FetchContent_MakeAvailable(libzmq)
+
+# ZeroMQ
+# cppzmq (C++ Header-Wrapper)
+FetchContent_Declare(
+  cppzmq
+  GIT_REPOSITORY https://github.com/zeromq/cppzmq.git
+  GIT_TAG master
+)
+FetchContent_MakeAvailable(cppzmq)
+
+# ---------- internal libraries ----------------
 include_directories(include)
+
+# power_trigger
 add_library(power_trigger_lib include/power_trigger/power_trigger.cc)
+
+# auto_corr
 add_library(auto_corr_lib include/correlation/auto_corr.cc)
 target_link_libraries(auto_corr_lib liquid)
+
+# signal_generator
 add_library(signal_generator_lib include/signal_generator/signal_generator.cc)
 target_link_libraries(signal_generator_lib liquid)
+
+# matlab_export
 add_library(matlab_export_lib include/matlab_export/matlab_export.cc)
 
+# zmq_socket
+add_library(zmq_socket include/zmq_socket/zmq_socket.cc)
+target_include_directories(zmq_socket PRIVATE ${cppzmq_SOURCE_DIR})
+target_link_libraries(zmq_socket PRIVATE libzmq)
 
 # ---------- Main Application  ----------------
 # source files
@@ -46,6 +78,7 @@ target_link_libraries(
   power_trigger_lib
   auto_corr_lib
   liquid
+  zmq_socket
   )
 
 # ---------- Sandbox ----------------
@@ -73,6 +106,7 @@ foreach(SOURCE_FILE ${SANDBOX_SRC_FILES})
     signal_generator_lib
     matlab_export_lib
     liquid
+    zmq_socket
   )
 
   # Include directories for each executable
