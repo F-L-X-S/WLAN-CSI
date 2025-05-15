@@ -154,7 +154,7 @@ int main(int argc, char*argv[])
         // Add gain of all subcarriers estimated in S1 after receiving the symbols
         if (cb_data.buffer.size() && !cb_data.cfr.size()){
             cb_data.cfr.resize(M);
-            ofdmframesync_get_subcarrier_gain(fs, &cb_data.cfr[0], M); 
+            ofdmframesync_get_cfr(fs, &cb_data.cfr[0], M); 
         };
     };
     
