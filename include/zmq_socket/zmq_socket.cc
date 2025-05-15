@@ -9,8 +9,29 @@ ZmqSender::ZmqSender(const std::string& endpoint)
 
 void ZmqSender::send(const std::vector<std::complex<float>>& data)
 {
-    zmq::message_t message(data.size() * sizeof(std::complex<float>));
-    std::memcpy(message.data(), data.data(), message.size());
+    const uint32_t numChannels = 1;
+    const uint32_t samplesPerChannel = data.size();
+
+    // Header: [numChannels, samplesPerChannel] → 2 × uint32_t
+    std::vector<uint8_t> buffer(sizeof(uint32_t) * 2 + numChannels * samplesPerChannel * sizeof(std::complex<float>));
+
+    // Pointer-Offset
+    uint8_t* ptr = buffer.data();
+
+    // Write Header
+    std::memcpy(ptr, &numChannels, sizeof(uint32_t));
+    ptr += sizeof(uint32_t);
+    std::memcpy(ptr, &samplesPerChannel, sizeof(uint32_t));
+    ptr += sizeof(uint32_t);
+
+    // Write Data
+    std::memcpy(ptr, data.data(), samplesPerChannel * sizeof(std::complex<float>));
+    ptr += samplesPerChannel * sizeof(std::complex<float>);
+
+
+    // Send message
+    zmq::message_t message(buffer.size());
+    std::memcpy(message.data(), buffer.data(), buffer.size());
     socket_.send(message, zmq::send_flags::none);
 }
 
