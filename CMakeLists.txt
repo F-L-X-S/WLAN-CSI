@@ -5,7 +5,7 @@ project(WLAN-CSI)
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# external packages
+# ---------- external packages ----------------
 include(FetchContent)
 
 # Liquid-DSP
@@ -24,11 +24,11 @@ link_directories(${liquid_SOURCE_DIR}/lib)
 
 
 # ZeroMQ
-# libzmq 
+# libzmq (remove for using local zmq installation)
 FetchContent_Declare(
   libzmq
   GIT_REPOSITORY https://github.com/zeromq/libzmq.git
-  GIT_TAG v4.3.5  # oder eine andere stabile Version
+  GIT_TAG v4.3.5  
 )
 FetchContent_MakeAvailable(libzmq)
 
@@ -37,9 +37,10 @@ FetchContent_MakeAvailable(libzmq)
 FetchContent_Declare(
   cppzmq
   GIT_REPOSITORY https://github.com/zeromq/cppzmq.git
-  GIT_TAG master
+  GIT_TAG v4.10.0
 )
 FetchContent_MakeAvailable(cppzmq)
+target_include_directories(cppzmq INTERFACE ${cppzmq_SOURCE_DIR})
 
 # ---------- internal libraries ----------------
 include_directories(include)
@@ -60,8 +61,7 @@ add_library(matlab_export_lib include/matlab_export/matlab_export.cc)
 
 # zmq_socket
 add_library(zmq_socket include/zmq_socket/zmq_socket.cc)
-target_include_directories(zmq_socket PRIVATE ${cppzmq_SOURCE_DIR})
-target_link_libraries(zmq_socket PRIVATE libzmq)
+target_link_libraries(zmq_socket cppzmq)
 
 # ---------- Main Application  ----------------
 # source files
@@ -89,6 +89,7 @@ set(SANDBOX_SRC_FILES
   sandbox/example_qdsync.cc
   sandbox/example_ofdmframesync.cc
   sandbox/example_ofdm_multisync.cc
+  sandbox/example_music.cc
 )
 
 # Iterate over each file in SOURCE_FILES
