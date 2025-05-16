@@ -22,19 +22,22 @@
 #define NUM_SAMPLES 1200            // Total Number of samples to be generated 
 #define SYMBOLS_PER_FRAME 3         // Number of data-ofdm-symbols transmitted per frame
 #define FRAME_START 30              // Start position of the ofdm-frame in the sequence
-#define NUM_CHANNELS 4              // Number of channels to be synchronized
+#define NUM_CHANNELS 10              // Number of channels to be synchronized
  
 
 // Definition of the channel impairments
 #define SNR_DB 37.0f                // Signal-to-noise ratio (dB)
 #define NOISE_FLOOR -92.0f          // Noise floor (dB)
-#define CFO 0.01f                   // Carrier frequency offset (radians per sample)
-#define PHASE_OFFSET 0.4            // Phase offset (radians) 
+#define CFO 0.0f                   // Carrier frequency offset (radians per sample)
+#define PHASE_OFFSET 0.0            // Phase offset (radians) 
 #define DELAY 0.3f                  // Delay for the first channel (samples)
-#define DDELAY 0.03f                // Differential Delay between receiving channels (samples)
+#define DDELAY 0.7f                 // Differential Delay between receiving channels (samples) 
 
 // Interface for zmq socket
 #define EXPORT_INTERFACE 'tcp://localhost:5555' 
+
+// Output file in MATLAB-format to store results
+#define OUTFILE "./matlab/example_music.m" 
 
 
 // custom data type to pass to callback function
@@ -173,6 +176,11 @@ int main(int argc, char*argv[])
     // initialize zmq socket for data export 
     ZmqSender sender("tcp://*:5555");
     std::vector<std::vector<std::complex<float>>> cfr(NUM_CHANNELS);   // Multidimensional buffer to store the cfr for all channels
+    std::vector<std::vector<std::complex<float>>> cir(NUM_CHANNELS);   // Multidimensional buffer to store the cir for all channels
+
+    cfr.assign(NUM_CHANNELS, std::vector<std::complex<float>>(M, std::complex<float>(0.0f, 0.0f)));   // Initialize the buffer with zeros
+    cir.assign(NUM_CHANNELS, std::vector<std::complex<float>>(M, std::complex<float>(0.0f, 0.0f)));   // Initialize the buffer with zeros
+
 
     // Samplewise synchronization of each channel
     std::vector<std::complex<float>> rx_sample(1);  // create vector of size 1 containing the current sample
@@ -187,18 +195,96 @@ int main(int argc, char*argv[])
             // Store the CFR of all channels (only once)
             if (cb_data[j].buffer.size() && !cb_data[j].cfr.size()){
                 ms.GetCfr(j, &cb_data[j].cfr, M);                               // Write cfr to callback data
-                cfr[j].assign(cb_data[j].cfr.begin(), cb_data[j].cfr.end());    // Copy the CFR to the multidimensional buffer
+                cfr[j].assign(cb_data[j].cfr.begin(), cb_data[j].cfr.end());    // Copy the CFR to the multidimensional buffer   
             };
         };
-        
+
+        // >>> virtual phaseshift for simulation <<<
+        // for (unsigned int ch = 0; ch < NUM_CHANNELS; ++ch) {
+        //     float phase_shift = (0.9f * ch) * M_PI;  
+        //     std::complex<float> phase_factor = std::polar(1.0f, phase_shift);
+
+        //     for (auto& val : cfr[ch]) {
+        //         val *= phase_factor;
+        //     }
+        // }                                        
         // Synchronize NCOs of all channels to the average NCO frequency and phase
         ms.SynchronizeNcos();
     };
-    sender.send(cfr);                                               // send the CFR to zmq socket
+
+    // shift the cfr to the center of the band
+    for (unsigned int ch = 0; ch < NUM_CHANNELS; ++ch) {
+        // shift the cfr to the center of the band
+        std::rotate(cfr[ch].begin(), cfr[ch].begin() + M/2, cfr[ch].end());
+    }
+
+    // compute the CIR from the CFR via IFFT
+    std::vector<std::complex<float>> cir_temp(M);
+    std::vector<std::complex<float>> cfr_temp(M);
+    for (unsigned int ch = 0; ch < NUM_CHANNELS; ++ch) {
+        cfr_temp = cfr[ch]; 
+        fftplan q = fft_create_plan(M, cfr_temp.data(), cir_temp.data(), LIQUID_FFT_BACKWARD, 0);
+        // compute the CIR from the CFR via IFFT
+        fft_execute(q); // IFFT
+        cir[ch] = cir_temp;
+        fft_destroy_plan(q);
+    }
     
+
+    // send the CFR to zmq socket  
+    sender.send(cir);                                               
     // destroy objects
     ofdmframegen_destroy(fg);
     fdelay_crcf_destroy(fd);
+
+// ----------------- MATLAB output ----------------------
+MatlabExport m_file(OUTFILE);
+
+// Export CFRs to MATLAB file
+for (unsigned int ch = 0; ch < NUM_CHANNELS; ++ch) {
+    std::string ch_suffix = std::to_string(ch);
+    m_file.Add(cfr[ch], "cfr_" + ch_suffix);
+    m_file.Add(cir[ch], "cir_" + ch_suffix);
+}
+
+// Add combined plot-commands to the MATLAB file
+std::stringstream matlab_cmd;
+matlab_cmd << "figure;";
+
+// CFR Magnitude
+matlab_cmd << "subplot(4,1,1); hold on;";
+for (unsigned int ch = 0; ch < NUM_CHANNELS; ++ch) {
+    std::string ch_suffix = std::to_string(ch);
+    matlab_cmd << "plot(abs(cfr_" << ch_suffix << "), 'DisplayName', 'RX-Channel " << ch_suffix << "');";
+}
+matlab_cmd << "title('Channel Frequency Response Gain'); legend; grid on;";
+
+// CFR Phase
+matlab_cmd << "subplot(4,1,2); hold on;";
+for (unsigned int ch = 0; ch < NUM_CHANNELS; ++ch) {
+    std::string ch_suffix = std::to_string(ch);
+    matlab_cmd << "plot(angle(cfr_" << ch_suffix << "), 'DisplayName', 'RX-Channel " << ch_suffix << "');";
+}
+matlab_cmd << "title('Channel Frequency Response Phase'); legend; grid on;";
+
+// CIR Magnitude
+matlab_cmd << "subplot(4,1,3); hold on;";
+for (unsigned int ch = 0; ch < NUM_CHANNELS; ++ch) {
+    std::string ch_suffix = std::to_string(ch);
+    matlab_cmd << "plot(abs(cir_" << ch_suffix << "), 'DisplayName', 'RX-Channel " << ch_suffix << "');";
+}
+matlab_cmd << "title('Channel Impulse Response Gain'); legend; grid on;";
+
+// CIR Phase
+matlab_cmd << "subplot(4,1,4); hold on;";
+for (unsigned int ch = 0; ch < NUM_CHANNELS; ++ch) {
+    std::string ch_suffix = std::to_string(ch);
+    matlab_cmd << "plot(angle(cir_" << ch_suffix << "), 'DisplayName', 'RX-Channel " << ch_suffix << "');";
+}
+matlab_cmd << "title('Channel Impulse Response Phase'); legend; grid on;";
+
+// Add the complete command string to MATLAB export
+m_file.Add(matlab_cmd.str());
 
     return 0;
 }
