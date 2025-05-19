@@ -22,7 +22,7 @@
 #define NUM_SAMPLES 1200            // Total Number of samples to be generated 
 #define SYMBOLS_PER_FRAME 3         // Number of data-ofdm-symbols transmitted per frame
 #define FRAME_START 30              // Start position of the ofdm-frame in the sequence
-#define NUM_CHANNELS 10              // Number of channels to be synchronized
+#define NUM_CHANNELS 4              // Number of channels to be synchronized
  
 
 // Definition of the channel impairments
@@ -30,8 +30,8 @@
 #define NOISE_FLOOR -92.0f          // Noise floor (dB)
 #define CFO 0.0f                   // Carrier frequency offset (radians per sample)
 #define PHASE_OFFSET 0.0            // Phase offset (radians) 
-#define DELAY 0.3f                  // Delay for the first channel (samples)
-#define DDELAY 0.7f                 // Differential Delay between receiving channels (samples) 
+#define DELAY 0.0f                  // Delay for the first channel (samples)
+#define DDELAY 0.2f                 // Differential Delay between receiving channels [samples] 
 
 // Interface for zmq socket
 #define EXPORT_INTERFACE 'tcp://localhost:5555' 
@@ -135,9 +135,8 @@ int main(int argc, char*argv[])
 
     // create delay object 
     unsigned int nmax       = 200;  // maximum delay
-    unsigned int m          =  12;  // filter semi-length
+    unsigned int m          =  16;  // filter semi-length
     unsigned int npfb       =  10;  // fractional delay resolution
-    fdelay_crcf fd = fdelay_crcf_create(nmax, m, npfb);
 
     // Insert the interpolated training field into the longer sequence at the specified start position 'TF_SYMBOL_START' 
     std::complex<float> tx[NUM_SAMPLES];                    // Buffer to store the transmitted signal (before channel impariments)     
@@ -149,14 +148,18 @@ int main(int argc, char*argv[])
         std::complex<float> rx_channel[NUM_SAMPLES];                                // Buffer to store the received signal a single channel
 
         // Add Time delay 
-        fdelay_crcf_set_delay(fd, DELAY+i*DDELAY);                                  // Set the delay for respective channel
+        fdelay_crcf fd = fdelay_crcf_create(nmax, m, npfb);
+        float delay = DELAY+((float)i*DDELAY);
+        fdelay_crcf_set_delay(fd, delay);                                           // Set the delay for respective channel
         fdelay_crcf_execute_block(fd, tx, NUM_SAMPLES, rx_channel);                 // Delay the signal    
+        fdelay_crcf_destroy(fd);
 
         // Add channel impairments
         channel_cccf channel = channel_cccf_copy(base_channel);                     // Copy the base channel
         channel_cccf_add_awgn(channel, NOISE_FLOOR, SNR_DB);                        // Set Noise for each channel
         channel_cccf_execute_block(channel, rx_channel, NUM_SAMPLES, rx_channel);   // Apply channel impairments to the signal          
-        
+        channel_cccf_destroy(channel);
+
         // Copy the received signal to the buffer for the respective channel
         rx[i].assign(rx_channel, rx_channel + NUM_SAMPLES);                         
     }
@@ -212,30 +215,35 @@ int main(int argc, char*argv[])
         ms.SynchronizeNcos();
     };
 
-    // shift the cfr to the center of the band
-    for (unsigned int ch = 0; ch < NUM_CHANNELS; ++ch) {
-        // shift the cfr to the center of the band
-        std::rotate(cfr[ch].begin(), cfr[ch].begin() + M/2, cfr[ch].end());
-    }
-
     // compute the CIR from the CFR via IFFT
     std::vector<std::complex<float>> cir_temp(M);
-    std::vector<std::complex<float>> cfr_temp(M);
     for (unsigned int ch = 0; ch < NUM_CHANNELS; ++ch) {
-        cfr_temp = cfr[ch]; 
-        fftplan q = fft_create_plan(M, cfr_temp.data(), cir_temp.data(), LIQUID_FFT_BACKWARD, 0);
-        // compute the CIR from the CFR via IFFT
-        fft_execute(q); // IFFT
-        cir[ch] = cir_temp;
-        fft_destroy_plan(q);
-    }
-    
+        // cfr_temp = cfr[ch]; // copy the cfr to a temporary buffer
+        // fftplan q = fft_create_plan(M, cfr_temp.data(), cir_temp.data(), LIQUID_FFT_BACKWARD, 0);
+        // // compute the CIR from the CFR via IFFT
+        // fft_execute(q); // IFFT
+        // cir[ch] = cir_temp;
+        // fft_destroy_plan(q);
 
-    // send the CFR to zmq socket  
-    sender.send(cir);                                               
+        // Manual comupation of the IFFT 
+        cir_temp.assign(M, std::complex<float>(0.0f, 0.0f)); // Initialize the cir_temp with zeros
+        for (unsigned int k = 0; k < M; ++k) {
+            for (unsigned int i = 0; i < M; ++i) {
+                    int n = (i > M/2) ? (float)i - (float)(M) : (float)i; // CFR is ordered by  1,..., (M/2-1),-(M/2),...,-1,0
+                    if (p[n] == OFDMFRAME_SCTYPE_NULL) // ignore null subcarriers
+                        continue;
+                    cir_temp[k] += cfr[ch][(n)]*std::exp(std::complex<float>(0.0f, 2.0f * M_PI * float(n * k) / float(M)));
+            };
+            cir_temp[k] /= (float)M; 
+        };
+        cir[ch] = cir_temp;
+    }
+
+    // send the CIR to zmq socket  
+    sender.send(cir);        
+
     // destroy objects
-    ofdmframegen_destroy(fg);
-    fdelay_crcf_destroy(fd);
+    ofdmframegen_destroy(fg);    
 
 // ----------------- MATLAB output ----------------------
 MatlabExport m_file(OUTFILE);
@@ -245,10 +253,24 @@ for (unsigned int ch = 0; ch < NUM_CHANNELS; ++ch) {
     std::string ch_suffix = std::to_string(ch);
     m_file.Add(cfr[ch], "cfr_" + ch_suffix);
     m_file.Add(cir[ch], "cir_" + ch_suffix);
+    m_file.Add(rx[ch], "x_" + ch_suffix);
 }
 
 // Add combined plot-commands to the MATLAB file
 std::stringstream matlab_cmd;
+// Signals 
+matlab_cmd << "figure; hold on;";
+for (unsigned int ch = 0; ch < NUM_CHANNELS; ++ch) {
+    std::string ch_suffix = std::to_string(ch);
+    matlab_cmd << "plot(real(x_" << ch_suffix
+               << "), 'DisplayName', 'Re (Ch " << ch_suffix << ")');";
+}
+matlab_cmd << "title('Time Domain'); xlabel('Sample Index'); ylabel('Amplitude');";
+matlab_cmd << "legend show; grid on;";
+matlab_cmd << std::endl;
+
+
+
 matlab_cmd << "figure;";
 
 // CFR Magnitude
@@ -258,6 +280,7 @@ for (unsigned int ch = 0; ch < NUM_CHANNELS; ++ch) {
     matlab_cmd << "plot(abs(cfr_" << ch_suffix << "), 'DisplayName', 'RX-Channel " << ch_suffix << "');";
 }
 matlab_cmd << "title('Channel Frequency Response Gain'); legend; grid on;";
+matlab_cmd << std::endl;
 
 // CFR Phase
 matlab_cmd << "subplot(4,1,2); hold on;";
@@ -266,6 +289,7 @@ for (unsigned int ch = 0; ch < NUM_CHANNELS; ++ch) {
     matlab_cmd << "plot(angle(cfr_" << ch_suffix << "), 'DisplayName', 'RX-Channel " << ch_suffix << "');";
 }
 matlab_cmd << "title('Channel Frequency Response Phase'); legend; grid on;";
+matlab_cmd << std::endl;
 
 // CIR Magnitude
 matlab_cmd << "subplot(4,1,3); hold on;";
@@ -274,6 +298,7 @@ for (unsigned int ch = 0; ch < NUM_CHANNELS; ++ch) {
     matlab_cmd << "plot(abs(cir_" << ch_suffix << "), 'DisplayName', 'RX-Channel " << ch_suffix << "');";
 }
 matlab_cmd << "title('Channel Impulse Response Gain'); legend; grid on;";
+matlab_cmd << std::endl;
 
 // CIR Phase
 matlab_cmd << "subplot(4,1,4); hold on;";
@@ -282,7 +307,29 @@ for (unsigned int ch = 0; ch < NUM_CHANNELS; ++ch) {
     matlab_cmd << "plot(angle(cir_" << ch_suffix << "), 'DisplayName', 'RX-Channel " << ch_suffix << "');";
 }
 matlab_cmd << "title('Channel Impulse Response Phase'); legend; grid on;";
+matlab_cmd << std::endl;
 
+
+// CFR in Complex 
+matlab_cmd << "figure;";
+matlab_cmd << "subplot(1,2,1); hold on;";
+for (unsigned int ch = 0; ch < NUM_CHANNELS; ++ch) {
+    std::string ch_suffix = std::to_string(ch);
+    matlab_cmd << "plot(real(cfr_" << ch_suffix << "), imag(cfr_" << ch_suffix
+               << "), '.', 'DisplayName', 'RX-Channel " << ch_suffix << "');";
+}
+matlab_cmd << "title('CFR'); xlabel('Real'); ylabel('Imag'); axis equal; legend; grid on;";
+matlab_cmd << std::endl;
+
+// CIR in Complex 
+matlab_cmd << "subplot(1,2,2); hold on;";
+for (unsigned int ch = 0; ch < NUM_CHANNELS; ++ch) {
+    std::string ch_suffix = std::to_string(ch);
+    matlab_cmd << "plot(real(cir_" << ch_suffix << "), imag(cir_" << ch_suffix
+               << "), '.', 'DisplayName', 'RX-Channel " << ch_suffix << "');";
+}
+matlab_cmd << "title('CIR'); xlabel('Real'); ylabel('Imag'); axis equal; legend; grid on;";
+matlab_cmd << std::endl;
 // Add the complete command string to MATLAB export
 m_file.Add(matlab_cmd.str());
 
