@@ -23,15 +23,15 @@
 #define SYMBOLS_PER_FRAME 3         // Number of data-ofdm-symbols transmitted per frame
 #define FRAME_START 30              // Start position of the ofdm-frame in the sequence
 #define NUM_CHANNELS 4              // Number of channels to be synchronized
-#define CARRIER_FREQUENCY 1e6f      // Frequency, the Signal is modulated to 
+#define CARRIER_FREQUENCY 9e6f      // Frequency, the Signal is modulated to 
 
 // Definition of the channel impairments
 #define SNR_DB 37.0f                // Signal-to-noise ratio [dB]
 #define NOISE_FLOOR -92.0f          // Noise floor [dB]
-#define CFO 0.0f                   // Carrier frequency offset [radians per sample]
+#define CFO 0.0f                    // Carrier frequency offset [radians per sample]
 #define PHASE_OFFSET 0.0            // Phase offset [radians]
-#define DELAY 0.1f                  // Delay for the first channel [samples] 
-#define DDELAY 0.4f                 // Differential Delay between receiving channels [samples] 
+#define DELAY 0.05f                 // Delay for the first channel [samples] 
+#define DDELAY 0.43f                // Differential Delay between receiving channels [samples] 
 
 // Interface for zmq socket
 #define EXPORT_INTERFACE 'tcp://localhost:5555' 
@@ -145,7 +145,7 @@ int main(int argc, char*argv[])
 
     // Delay filter parameters
     unsigned int nmax       =   200;            // maximum delay
-    unsigned int m          =   taper_len;      // filter semi-length
+    unsigned int m          =   cp_len;         // filter semi-length
     unsigned int npfb       =   100;            // fractional delay resolution
 
     // Apply channel to the generated signal
@@ -248,7 +248,7 @@ int main(int argc, char*argv[])
                     int n = (i > M/2) ? (float)i - (float)(M) : (float)i; // CFR is ordered by  1,..., (M/2-1),-(M/2),...,-1,0
                     if (p[n] == OFDMFRAME_SCTYPE_NULL) // ignore null subcarriers
                         continue;
-                    cir_temp[k] += cfr[ch][(n)]*std::exp(std::complex<float>(0.0f, 2.0f * M_PI * float(n * k) / float(M)));
+                    cir_temp[k] += cfr[ch][(i)]*std::exp(std::complex<float>(0.0f, 2.0f * M_PI * float(n * k) / float(M)));
             };
             cir_temp[k] /= (float)M; 
         };
