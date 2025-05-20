@@ -9,8 +9,6 @@
 # @version 0.1
 # @date 2025-05-20
 
-
-
 import pathlib
 import sys
 
@@ -39,7 +37,7 @@ csi_all = None
 print("Receiving Data...")
 
 while True:
-    socks = dict(poller.poll(timeout=10000))  # 10000 ms
+    socks = dict(poller.poll(timeout=3000))  # 3000 ms
 
     if socket in socks:
         msg = socket.recv()
@@ -63,11 +61,13 @@ while True:
             csi_all = np.concatenate((csi_all, csi), axis=0)
             
     else:
-        print("Socket timeout")
-        break
+        if (csi_all is not None):
+            print("Socket timeout - continuing with received data:\n")
+            print(f"Received: {csi_all.shape=}")
+            break
     
     
-print(f"Received: {csi_all.shape=}")
+
 
 class EspargosDemoMusicSpectrum(PyQt6.QtWidgets.QApplication):
 	def __init__(self, argv):
