@@ -1,3 +1,18 @@
+/**
+ * @file multisync.h
+ * @author Felix Schuelke (flxscode@gmail.com)
+ * 
+ * @brief This file contains the definition of the MultiSync class, which is a generic multi-synchronizer class to handle multiple receiving channels.
+ * The class provides C++-interfaces for different types of synchronizers, such as OFDM frame synchronizers.
+ * The Liquid-DSP-interface of the specified Synchronizer is defined in the SyncTraits struct.
+ * Liquid's DSP-modules are based on https://github.com/jgaeddert/liquid-dsp (Copyright (c) 2007 - 2016 Joseph Gaeddert).
+ * 
+ * @version 0.1
+ * @date 2025-05-20
+ * 
+ * 
+ */
+
 #ifndef MULTISYNC_H
 #define MULTISYNC_H
 

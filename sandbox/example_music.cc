@@ -1,8 +1,15 @@
 /**
  * @file example_music.cc
+ * @author Felix Schuelke (flxscode@gmail.com)
+ * 
  * @brief This example demonstrates the usage of multiple OFDM frame synchronizers within multisync 
  * for receiving multiple channels with different channel impairments like in an antenna array.
- * The CFR is exported via ZeroMq to be processed within the MUSIC algorithm in Python.
+ * The CFR or CIR is exported via ZeroMq to be processed within the MUSIC algorithm in Python for estimating the DOA.
+ * The usage of Liquid's DSP-modules is based on https://github.com/jgaeddert/liquid-dsp (Copyright (c) 2007 - 2016 Joseph Gaeddert).
+ * 
+ * @version 0.1
+ * @date 2025-05-20
+ * 
  * 
  */
 
@@ -22,16 +29,16 @@
 #define NUM_SAMPLES 1200            // Total Number of samples to be generated 
 #define SYMBOLS_PER_FRAME 3         // Number of data-ofdm-symbols transmitted per frame
 #define FRAME_START 30              // Start position of the ofdm-frame in the sequence
-#define NUM_CHANNELS 4              // Number of channels to be synchronized
+#define NUM_CHANNELS 10             // Number of channels to be synchronized
 #define CARRIER_FREQUENCY 9e6f      // Frequency, the Signal is modulated to 
 
 // Definition of the channel impairments
 #define SNR_DB 37.0f                // Signal-to-noise ratio [dB]
 #define NOISE_FLOOR -92.0f          // Noise floor [dB]
-#define CFO 0.0f                    // Carrier frequency offset [radians per sample]
-#define PHASE_OFFSET 0.0            // Phase offset [radians]
+#define CFO 0.04f                   // Carrier frequency offset [radians per sample]
+#define PHASE_OFFSET 2.0            // Phase offset [radians]
 #define DELAY 0.05f                 // Delay for the first channel [samples] 
-#define DDELAY 0.43f                // Differential Delay between receiving channels [samples] 
+#define DDELAY 1.3f                 // Differential Delay between receiving channels [samples] 
 
 // Interface for zmq socket
 #define EXPORT_INTERFACE 'tcp://localhost:5555' 
@@ -288,9 +295,8 @@ matlab_cmd << std::endl;
 
 
 matlab_cmd << "figure;";
-
 // CFR Magnitude
-matlab_cmd << "subplot(4,1,1); hold on;";
+matlab_cmd << "subplot(2,1,1); hold on;";
 for (unsigned int ch = 0; ch < NUM_CHANNELS; ++ch) {
     std::string ch_suffix = std::to_string(ch);
     matlab_cmd << "plot(abs(cfr_" << ch_suffix << "), 'DisplayName', 'RX-Channel " << ch_suffix << "');";
@@ -299,7 +305,7 @@ matlab_cmd << "title('Channel Frequency Response Gain'); legend; grid on;";
 matlab_cmd << std::endl;
 
 // CFR Phase
-matlab_cmd << "subplot(4,1,2); hold on;";
+matlab_cmd << "subplot(2,1,2); hold on;";
 for (unsigned int ch = 0; ch < NUM_CHANNELS; ++ch) {
     std::string ch_suffix = std::to_string(ch);
     matlab_cmd << "plot(angle(cfr_" << ch_suffix << "), 'DisplayName', 'RX-Channel " << ch_suffix << "');";
@@ -308,7 +314,8 @@ matlab_cmd << "title('Channel Frequency Response Phase'); legend; grid on;";
 matlab_cmd << std::endl;
 
 // CIR Magnitude
-matlab_cmd << "subplot(4,1,3); hold on;";
+matlab_cmd << "figure;";
+matlab_cmd << "subplot(2,1,1); hold on;";
 for (unsigned int ch = 0; ch < NUM_CHANNELS; ++ch) {
     std::string ch_suffix = std::to_string(ch);
     matlab_cmd << "plot(abs(cir_" << ch_suffix << "), 'DisplayName', 'RX-Channel " << ch_suffix << "');";
@@ -317,7 +324,7 @@ matlab_cmd << "title('Channel Impulse Response Gain'); legend; grid on;";
 matlab_cmd << std::endl;
 
 // CIR Phase
-matlab_cmd << "subplot(4,1,4); hold on;";
+matlab_cmd << "subplot(2,1,2); hold on;";
 for (unsigned int ch = 0; ch < NUM_CHANNELS; ++ch) {
     std::string ch_suffix = std::to_string(ch);
     matlab_cmd << "plot(angle(cir_" << ch_suffix << "), 'DisplayName', 'RX-Channel " << ch_suffix << "');";

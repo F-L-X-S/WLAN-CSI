@@ -1,4 +1,20 @@
-// https://github.com/jgaeddert/liquid-dsp/blob/master/examples/autocorr_cccf_example.c
+/**
+ * @file signal_generator.h
+ * @author Felix Schuelke (flxscode@gmail.com)
+ * 
+ * @brief This file contains the definition of the SignalGenerator class,
+ * which is used to generate a sequence of samples, containing a repeating pattern of the length `symbol_len`,
+ * that is repeated 'symbol_repetitions' times.
+ * The class provides functions to generate a repeating sequence, insert a sequence into another sequence,
+ * and add noise to a sequence of complex samples.
+ * Liquid's DSP-modules are based on https://github.com/jgaeddert/liquid-dsp (Copyright (c) 2007 - 2016 Joseph Gaeddert).
+ * 
+ * @version 0.1
+ * @date 2025-05-20
+ * 
+ * 
+ */
+
 #ifndef SIGNAL_GENERATOR_H
 #define SIGNAL_GENERATOR_H
 #include <complex>

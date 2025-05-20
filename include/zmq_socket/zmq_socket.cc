@@ -1,3 +1,15 @@
+/**
+ * @file zmq_socket.cc
+ * @author Felix Schuelke (flxscode@gmail.com)
+ * 
+ * @brief This file contains the definition of the ZmqSender class, which is used to send vector-formatted data via ZeroMQ sockets.
+ * 
+ * @version 0.1
+ * @date 2025-05-20
+ * 
+ * 
+ */
+
 #include "zmq_socket.h"
 #include <cstring>
 

@@ -1,3 +1,16 @@
+/**
+ * @file matlab_export.cc
+ * @author Felix Schuelke (flxscode@gmail.com)
+ * 
+ * @brief This file contains the definition of the MatlabExport class, 
+ * which is used to export vector-formatted data from C++ to a MATLAB file.
+ * 
+ * @version 0.1
+ * @date 2025-05-20
+ * 
+ * 
+ */
+
 #include <matlab_export/matlab_export.h>
 #include <iostream>
 
