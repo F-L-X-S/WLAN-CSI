@@ -23,15 +23,15 @@
 #define SYMBOLS_PER_FRAME 3         // Number of data-ofdm-symbols transmitted per frame
 #define FRAME_START 30              // Start position of the ofdm-frame in the sequence
 #define NUM_CHANNELS 4              // Number of channels to be synchronized
- 
+#define CARRIER_FREQUENCY 1e6f      // Frequency, the Signal is modulated to 
 
 // Definition of the channel impairments
-#define SNR_DB 37.0f                // Signal-to-noise ratio (dB)
-#define NOISE_FLOOR -92.0f          // Noise floor (dB)
-#define CFO 0.0f                   // Carrier frequency offset (radians per sample)
-#define PHASE_OFFSET 0.0            // Phase offset (radians) 
-#define DELAY 0.0f                  // Delay for the first channel (samples)
-#define DDELAY 0.2f                 // Differential Delay between receiving channels [samples] 
+#define SNR_DB 37.0f                // Signal-to-noise ratio [dB]
+#define NOISE_FLOOR -92.0f          // Noise floor [dB]
+#define CFO 0.0f                   // Carrier frequency offset [radians per sample]
+#define PHASE_OFFSET 0.0            // Phase offset [radians]
+#define DELAY 0.1f                  // Delay for the first channel [samples] 
+#define DDELAY 0.4f                 // Differential Delay between receiving channels [samples] 
 
 // Interface for zmq socket
 #define EXPORT_INTERFACE 'tcp://localhost:5555' 
@@ -128,21 +128,27 @@ int main(int argc, char*argv[])
         n += frame_len;
     }
 
-    // ------------------- Channel impairments ----------------------
-    // create base channel object
-    channel_cccf base_channel = channel_cccf_create();
-    channel_cccf_add_carrier_offset(base_channel, CFO, PHASE_OFFSET);    // Add Carrier Frequency Offset and Phase Offset
-
-    // create delay object 
-    unsigned int nmax       = 200;  // maximum delay
-    unsigned int m          =  16;  // filter semi-length
-    unsigned int npfb       =  10;  // fractional delay resolution
-
     // Insert the interpolated training field into the longer sequence at the specified start position 'TF_SYMBOL_START' 
     std::complex<float> tx[NUM_SAMPLES];                    // Buffer to store the transmitted signal (before channel impariments)     
     InsertSequence(tx, y, FRAME_START, n);
 
-    // apply channel to the generated signal
+    // Mix Up 
+    nco_crcf nco_tx = nco_crcf_create(LIQUID_NCO);
+    nco_crcf_set_frequency(nco_tx, 2*M_PI*CARRIER_FREQUENCY);
+    nco_crcf_mix_block_up(nco_tx, tx, tx, NUM_SAMPLES);
+    nco_crcf_destroy(nco_tx);                               
+
+    // ------------------- Channel impairments ----------------------
+    // Create base channel object
+    channel_cccf base_channel = channel_cccf_create();
+    channel_cccf_add_carrier_offset(base_channel, CFO, PHASE_OFFSET);    // Add Carrier Frequency Offset and Phase Offset
+
+    // Delay filter parameters
+    unsigned int nmax       =   200;            // maximum delay
+    unsigned int m          =   taper_len;      // filter semi-length
+    unsigned int npfb       =   100;            // fractional delay resolution
+
+    // Apply channel to the generated signal
     std::vector<std::vector<std::complex<float>>> rx(NUM_CHANNELS);                 // Buffer to store the received signal for all channels
     for (unsigned int i = 0; i < NUM_CHANNELS; ++i) {
         std::complex<float> rx_channel[NUM_SAMPLES];                                // Buffer to store the received signal a single channel
@@ -178,24 +184,28 @@ int main(int argc, char*argv[])
 
     // initialize zmq socket for data export 
     ZmqSender sender("tcp://*:5555");
+
+    // Channel frequency response (CFR) and channel impulse response (CIR)
     std::vector<std::vector<std::complex<float>>> cfr(NUM_CHANNELS);   // Multidimensional buffer to store the cfr for all channels
     std::vector<std::vector<std::complex<float>>> cir(NUM_CHANNELS);   // Multidimensional buffer to store the cir for all channels
-
     cfr.assign(NUM_CHANNELS, std::vector<std::complex<float>>(M, std::complex<float>(0.0f, 0.0f)));   // Initialize the buffer with zeros
     cir.assign(NUM_CHANNELS, std::vector<std::complex<float>>(M, std::complex<float>(0.0f, 0.0f)));   // Initialize the buffer with zeros
 
+    // Synchronized NCO for all channels
+    nco_crcf nco_rx = nco_crcf_create(LIQUID_NCO);
+    nco_crcf_set_frequency(nco_rx, 2*M_PI*CARRIER_FREQUENCY);
 
     // Samplewise synchronization of each channel
     std::vector<std::complex<float>> rx_sample(1);  // create vector of size 1 containing the current sample
     for (unsigned int i = 0; i < NUM_SAMPLES; ++i) {
         for (unsigned int j = 0; j < NUM_CHANNELS; ++j){
-            // get the current sample of the channel
-            rx_sample[0]= rx[j][i];             
+            // Mix down respective channel to complex baseband
+            nco_crcf_mix_down(nco_rx, rx[j][i], rx_sample.data());
 
             // execute the respective synchronizer
             ms.Execute(j, &rx_sample);
 
-            // Store the CFR of all channels (only once)
+            // Store the CFR (only once)
             if (cb_data[j].buffer.size() && !cb_data[j].cfr.size()){
                 ms.GetCfr(j, &cb_data[j].cfr, M);                               // Write cfr to callback data
                 cfr[j].assign(cb_data[j].cfr.begin(), cb_data[j].cfr.end());    // Copy the CFR to the multidimensional buffer   
@@ -210,9 +220,13 @@ int main(int argc, char*argv[])
         //     for (auto& val : cfr[ch]) {
         //         val *= phase_factor;
         //     }
-        // }                                        
+        // }        
+
         // Synchronize NCOs of all channels to the average NCO frequency and phase
         ms.SynchronizeNcos();
+
+        // Step up the shared receiver NCO 
+        nco_crcf_step(nco_rx);
     };
 
     // compute the CIR from the CFR via IFFT
@@ -222,6 +236,8 @@ int main(int argc, char*argv[])
         // fftplan q = fft_create_plan(M, cfr_temp.data(), cir_temp.data(), LIQUID_FFT_BACKWARD, 0);
         // // compute the CIR from the CFR via IFFT
         // fft_execute(q); // IFFT
+        // for (unsigned int k=0; k<M; k++)
+        //     cir_temp[i] /= (float) M;
         // cir[ch] = cir_temp;
         // fft_destroy_plan(q);
 
