@@ -42,6 +42,16 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(cppzmq)
 target_include_directories(cppzmq INTERFACE ${cppzmq_SOURCE_DIR})
 
+# Find UHD
+find_package(UHD REQUIRED)
+
+# Find Boost
+find_package(Boost REQUIRED COMPONENTS program_options thread)
+
+# Include-Paths
+include_directories(${Boost_INCLUDE_DIRS})
+include_directories(${UHD_INCLUDE_DIRS})
+
 # ---------- internal libraries ----------------
 include_directories(include)
 
@@ -79,6 +89,8 @@ target_link_libraries(
   auto_corr_lib
   liquid
   zmq_socket
+  ${UHD_LIBRARIES}
+  ${Boost_LIBRARIES}
   )
 
 # ---------- Sandbox ----------------
@@ -90,6 +102,7 @@ set(SANDBOX_SRC_FILES
   sandbox/example_ofdmframesync.cc
   sandbox/example_ofdm_multisync.cc
   sandbox/example_music.cc
+  sandbox/example_usrp.cc
 )
 
 # Iterate over each file in SOURCE_FILES
@@ -108,6 +121,8 @@ foreach(SOURCE_FILE ${SANDBOX_SRC_FILES})
     matlab_export_lib
     liquid
     zmq_socket
+    ${UHD_LIBRARIES}
+    ${Boost_LIBRARIES}
   )
 
   # Include directories for each executable
