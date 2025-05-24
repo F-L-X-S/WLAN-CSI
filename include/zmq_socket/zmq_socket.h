@@ -22,6 +22,7 @@ public:
     ZmqSender(const std::string& endpoint);
     void send(const std::vector<std::complex<float>>& data);
     void send(const std::vector<std::vector<std::complex<float>>>& data);
+    void send(const std::vector<std::vector<std::vector<std::complex<float>>>>& data);
 
 private:
     zmq::context_t context_;

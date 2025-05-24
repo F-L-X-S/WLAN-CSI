@@ -25,62 +25,60 @@ import struct
 
 ANTENNAS_PER_ROW = 10
 
-# ZMQ socket setup
-context = zmq.Context()
-socket = context.socket(zmq.PULL)
-socket.connect("tcp://localhost:5555")
-poller = zmq.Poller()
-poller.register(socket, zmq.POLLIN)
+class MusicSpectrum(PyQt6.QtWidgets.QApplication):
+	def pollSocket(self):
+		socks = dict(self.poller.poll(timeout=0))
 
-# initalize received data
-csi_all = None
-print("Receiving Data...")
+		if self.socket in socks:
+			msg = self.socket.recv()
+			
+			# Header: 3 x uint32 → 12 bytes
+			n_measurements, num_channels, samples_per_channel = struct.unpack("III", msg[:12])
 
-while True:
-    socks = dict(poller.poll(timeout=3000))  # 3000 ms
+         	# Load Data (complex values)
+			data = np.frombuffer(msg[12:], dtype=np.complex64)
+   
+			# Transform to  (num_channels, samples_per_channel) 
+			try:
+				reshaped = data.reshape((n_measurements, num_channels, samples_per_channel))
+			except ValueError:
+				return  # skip invalid reshape
 
-    if socket in socks:
-        msg = socket.recv()
+    		# shape : (size, n_arrays, n_rows, n_antennas, subcarriers)
+			self.csi = reshaped[:, np.newaxis, np.newaxis, :, :]
+   
+			# modify steering vectors
+			if num_channels != self.antennas_per_row:
+				self.antennas_per_row = num_channels
+				self.steering_vectors = np.exp(-1.0j * np.outer(np.pi * np.sin(self.scanning_angles), np.arange(self.antennas_per_row)))
 
-        # Header: 2 x uint32 → 8 bytes
-        num_channels, samples_per_channel = struct.unpack("II", msg[:8])
-
-        # Data: complex values
-        data = np.frombuffer(msg[8:], dtype=np.complex64)
-        
-        # Transform to  (num_channels, samples_per_channel) 
-        reshaped = data.reshape((num_channels, samples_per_channel))
-
-        # shape : (size, n_boards, n_rows, n_antennas, subcarriers)
-        csi = reshaped[np.newaxis, np.newaxis, np.newaxis, :, :]
-
-        # Stack on axis (size)
-        if csi_all is None:
-            csi_all = csi
-        else:
-            csi_all = np.concatenate((csi_all, csi), axis=0)
-            
-    else:
-        if (csi_all is not None):
-            print("Socket timeout - continuing with received data:\n")
-            print(f"Received: {csi_all.shape=}")
-            break
-    
-    
-
-
-class EspargosDemoMusicSpectrum(PyQt6.QtWidgets.QApplication):
+		
 	def __init__(self, argv):
 		super().__init__(argv)
 
 		# Qt setup
 		self.aboutToQuit.connect(self.onAboutToQuit)
 		self.engine = PyQt6.QtQml.QQmlApplicationEngine()
+		
+		# ZMQ socket setup
+		context = zmq.Context()
+		self.socket = context.socket(zmq.PULL)
+		self.socket.connect("tcp://localhost:5555")
+		self.poller = zmq.Poller()
+		self.poller.register(self.socket, zmq.POLLIN)
+		self.csi = None
+		self.antennas_per_row = 10
 
 		# Initialize MUSIC scanning angles, steering vectors, ...
 		self.scanning_angles = np.linspace(-np.pi / 2, np.pi / 2, 180) 
-		self.steering_vectors = np.exp(-1.0j * np.outer(np.pi * np.sin(self.scanning_angles), np.arange(ANTENNAS_PER_ROW))) #[-pi...pi] in 180 steps
+		self.steering_vectors = np.exp(-1.0j * np.outer(np.pi * np.sin(self.scanning_angles), np.arange(self.antennas_per_row))) #[-pi...pi] in 180 steps
 		self.spatial_spectrum = None
+
+		# Poll CSI from socket
+		self.timer = PyQt6.QtCore.QTimer()
+		self.timer.timeout.connect(self.pollSocket)
+		self.timer.start(100) # 100ms
+
 
 	def exec(self):
 		context = self.engine.rootContext()
@@ -95,9 +93,11 @@ class EspargosDemoMusicSpectrum(PyQt6.QtWidgets.QApplication):
 
 	@PyQt6.QtCore.pyqtSlot(PyQt6.QtCharts.QLineSeries, PyQt6.QtCharts.QValueAxis)
 	def updateSpatialSpectrum(self, series, axis):
+		if self.csi is None:
+			return
 
 		# compute the covariance matrix
-		R = np.einsum("dbris,dbrjs->ij", csi_all, np.conj(csi_all))
+		R = np.einsum("dbris,dbrjs->ij", self.csi, np.conj(self.csi))
   
 		# eigenvalue decomposition
 		eig_val, eig_vec = np.linalg.eig(R)
@@ -125,5 +125,5 @@ class EspargosDemoMusicSpectrum(PyQt6.QtWidgets.QApplication):
 	def scanningAngles(self):
 		return self.scanning_angles.tolist()
 
-app = EspargosDemoMusicSpectrum(sys.argv)
+app = MusicSpectrum(sys.argv)
 sys.exit(app.exec())
