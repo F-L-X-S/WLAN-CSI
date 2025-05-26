@@ -24,21 +24,20 @@
  #include <multisync/multisync.h>
  #include <zmq_socket/zmq_socket.h>
 
-
 // Definition of the transmission-settings 
-#define NUM_SAMPLES 1200            // Total Number of samples to be generated 
+#define NUM_SAMPLES 150000            // Total Number of samples to be generated 
 #define SYMBOLS_PER_FRAME 3         // Number of data-ofdm-symbols transmitted per frame
 #define FRAME_START 30              // Start position of the ofdm-frame in the sequence
 #define NUM_CHANNELS 10             // Number of channels to be synchronized
-#define CARRIER_FREQUENCY 9e6f      // Frequency, the Signal is modulated to 
+#define CARRIER_FREQUENCY 7680.0f   // Frequency, the Signal is modulated to (2.4GHz/20MHz = 120, 64 Samples per Symbol * 120 -> 7680 Samples per Symbol)
 
 // Definition of the channel impairments
 #define SNR_DB 37.0f                // Signal-to-noise ratio [dB]
 #define NOISE_FLOOR -92.0f          // Noise floor [dB]
-#define CFO 0.04f                   // Carrier frequency offset [radians per sample]
-#define PHASE_OFFSET 2.0            // Phase offset [radians]
-#define DELAY 0.05f                 // Delay for the first channel [samples] 
-#define DDELAY 1.3f                 // Differential Delay between receiving channels [samples] 
+#define CFO 0.04f                    // Carrier frequency offset [radians per sample]
+#define PHASE_OFFSET 0.3            // Phase offset [radians]
+#define DELAY 10.0f                 // Delay for the first channel [samples] 
+#define DDELAY 1.0f                 // Differential Delay between receiving channels [samples] (sin(45°)*pi= 2.2214)
 
 // Interface for zmq socket
 #define EXPORT_INTERFACE 'tcp://localhost:5555' 
@@ -102,20 +101,20 @@ int main(int argc, char*argv[])
     // create frame generator
     ofdmframegen fg = ofdmframegen_create(M, cp_len, taper_len, p);
 
-    std::complex<float> y[frame_samples];     // output time series
+    std::complex<float> tx_base[frame_samples];     // complex baseband signal buffer
     std::complex<float> X[M];                 // channelized symbols
     unsigned int n=0;                         // Sample number in time domains
 
     // write first S0 symbol
-    ofdmframegen_write_S0a(fg, &y[n]);
+    ofdmframegen_write_S0a(fg, &tx_base[n]);
     n += frame_len;
 
     // write second S0 symbol
-    ofdmframegen_write_S0b(fg, &y[n]);
+    ofdmframegen_write_S0b(fg, &tx_base[n]);
     n += frame_len;
 
     // write S1 symbol
-    ofdmframegen_write_S1( fg, &y[n]);
+    ofdmframegen_write_S1( fg, &tx_base[n]);
     n += frame_len;
 
     // modulate data subcarriers
@@ -131,21 +130,26 @@ int main(int argc, char*argv[])
         }
 
         // generate OFDM symbol in the time domain
-        ofdmframegen_writesymbol(fg, X, &y[n]);
+        ofdmframegen_writesymbol(fg, X, &tx_base[n]);
         n += frame_len;
     }
 
-    // Insert the interpolated training field into the longer sequence at the specified start position 'TF_SYMBOL_START' 
-    std::complex<float> tx[NUM_SAMPLES];                    // Buffer to store the transmitted signal (before channel impariments)     
-    InsertSequence(tx, y, FRAME_START, n);
+    // ------------------- Upconversion ---------------------
+    // Resample signal to match carrier
+    unsigned int tx_len = (unsigned int)(frame_samples*ceil(CARRIER_FREQUENCY/M));
+    std::complex<float> tx[tx_len];
+    msresamp_crcf resamp_tx = msresamp_crcf_create(CARRIER_FREQUENCY/M,60.0);
+    unsigned int ny;
+    msresamp_crcf_execute(resamp_tx, tx_base, frame_samples, tx, &ny);
+    msresamp_crcf_destroy(resamp_tx);
 
     // Mix Up 
     nco_crcf nco_tx = nco_crcf_create(LIQUID_NCO);
     nco_crcf_set_frequency(nco_tx, 2*M_PI*CARRIER_FREQUENCY);
-    nco_crcf_mix_block_up(nco_tx, tx, tx, NUM_SAMPLES);
+    nco_crcf_mix_block_up(nco_tx, tx, tx, tx_len);
     nco_crcf_destroy(nco_tx);                               
 
-    // ------------------- Channel impairments ----------------------
+    // ------------------- Channel impairments ---------------------
     // Create base channel object
     channel_cccf base_channel = channel_cccf_create();
     channel_cccf_add_carrier_offset(base_channel, CFO, PHASE_OFFSET);    // Add Carrier Frequency Offset and Phase Offset
@@ -156,9 +160,14 @@ int main(int argc, char*argv[])
     unsigned int npfb       =   100;            // fractional delay resolution
 
     // Apply channel to the generated signal
-    std::vector<std::vector<std::complex<float>>> rx(NUM_CHANNELS);                 // Buffer to store the received signal for all channels
+    std::vector<std::vector<std::complex<float>>> rx_base(NUM_CHANNELS);                 // Buffer to store the received signal for all channels
+    unsigned int rx_base_len = ceil(NUM_SAMPLES*((float)M/CARRIER_FREQUENCY)); 
+
     for (unsigned int i = 0; i < NUM_CHANNELS; ++i) {
         std::complex<float> rx_channel[NUM_SAMPLES];                                // Buffer to store the received signal a single channel
+
+        // Insert the transmitted sequence into the longer rx_channel at the specified start position 'TF_SYMBOL_START'   
+        InsertSequence(rx_channel, tx, FRAME_START, tx_len);
 
         // Add Time delay 
         fdelay_crcf fd = fdelay_crcf_create(nmax, m, npfb);
@@ -173,9 +182,23 @@ int main(int argc, char*argv[])
         channel_cccf_execute_block(channel, rx_channel, NUM_SAMPLES, rx_channel);   // Apply channel impairments to the signal          
         channel_cccf_destroy(channel);
 
+        // ------------------- Downconversion ---------------------
+        // Mix down respective channel to complex baseband
+        nco_crcf nco_rx = nco_crcf_create(LIQUID_NCO);
+        nco_crcf_set_frequency(nco_rx, 2*M_PI*CARRIER_FREQUENCY);
+        nco_crcf_mix_block_down(nco_rx, rx_channel, rx_channel, NUM_SAMPLES);
+        nco_crcf_destroy(nco_rx);       
+        
+        // Resample the received signal 
+        std::complex<float> rx_channel_base[rx_base_len]; // Buffer to store the received signal a single channel
+        msresamp_crcf resamp_rx = msresamp_crcf_create(M/CARRIER_FREQUENCY,60.0);
+        msresamp_crcf_execute(resamp_rx, rx_channel, NUM_SAMPLES, rx_channel_base, &ny);
+        msresamp_crcf_destroy(resamp_rx);
+
         // Copy the received signal to the buffer for the respective channel
-        rx[i].assign(rx_channel, rx_channel + NUM_SAMPLES);                         
+        rx_base[i].assign(rx_channel_base, rx_channel_base + rx_base_len);         
     }
+
 
     // ----------------- Synchronization ----------------------
     // callback data
@@ -204,12 +227,10 @@ int main(int argc, char*argv[])
 
     // Samplewise synchronization of each channel
     std::vector<std::complex<float>> rx_sample(1);  // create vector of size 1 containing the current sample
-    for (unsigned int i = 0; i < NUM_SAMPLES; ++i) {
+    for (unsigned int i = 0; i < rx_base_len; ++i) {
         for (unsigned int j = 0; j < NUM_CHANNELS; ++j){
-            // Mix down respective channel to complex baseband
-            nco_crcf_mix_down(nco_rx, rx[j][i], rx_sample.data());
-
             // execute the respective synchronizer
+            rx_sample[0]= rx_base[j][i];             
             ms.Execute(j, &rx_sample);
 
             // Store the CFR (only once)
@@ -219,21 +240,8 @@ int main(int argc, char*argv[])
             };
         };
 
-        // >>> virtual phaseshift for simulation <<<
-        // for (unsigned int ch = 0; ch < NUM_CHANNELS; ++ch) {
-        //     float phase_shift = (0.9f * ch) * M_PI;  
-        //     std::complex<float> phase_factor = std::polar(1.0f, phase_shift);
-
-        //     for (auto& val : cfr[ch]) {
-        //         val *= phase_factor;
-        //     }
-        // }        
-
         // Synchronize NCOs of all channels to the average NCO frequency and phase
-        ms.SynchronizeNcos();
-
-        // Step up the shared receiver NCO 
-        nco_crcf_step(nco_rx);
+        //ms.SynchronizeNcos();
     };
 
     // compute the CIR from the CFR via IFFT
@@ -276,7 +284,7 @@ for (unsigned int ch = 0; ch < NUM_CHANNELS; ++ch) {
     std::string ch_suffix = std::to_string(ch);
     m_file.Add(cfr[ch], "cfr_" + ch_suffix);
     m_file.Add(cir[ch], "cir_" + ch_suffix);
-    m_file.Add(rx[ch], "x_" + ch_suffix);
+    m_file.Add(rx_base[ch], "x_" + ch_suffix);
 }
 
 // Add combined plot-commands to the MATLAB file
