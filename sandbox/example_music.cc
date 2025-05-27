@@ -25,19 +25,19 @@
  #include <zmq_socket/zmq_socket.h>
 
 // Definition of the transmission-settings 
-#define NUM_SAMPLES 150000            // Total Number of samples to be generated 
+#define NUM_SAMPLES 150000          // Total Number of samples to be generated 
 #define SYMBOLS_PER_FRAME 3         // Number of data-ofdm-symbols transmitted per frame
 #define FRAME_START 30              // Start position of the ofdm-frame in the sequence
 #define NUM_CHANNELS 10             // Number of channels to be synchronized
-#define CARRIER_FREQUENCY 7680.0f   // Frequency, the Signal is modulated to (2.4GHz/20MHz = 120, 64 Samples per Symbol * 120 -> 7680 Samples per Symbol)
+#define CARRIER_FREQUENCY 9600.0f   // Frequency, the Signal is modulated to (2.4GHz/20MHz = 120, M+CP Samples per Symbol (64+16)* 120 -> 9600 Samples per Symbol in 2.4GHz domain)
 
 // Definition of the channel impairments
 #define SNR_DB 37.0f                // Signal-to-noise ratio [dB]
 #define NOISE_FLOOR -92.0f          // Noise floor [dB]
-#define CFO 0.04f                    // Carrier frequency offset [radians per sample]
-#define PHASE_OFFSET 0.3            // Phase offset [radians]
+#define CFO 0.00f                   // Carrier frequency offset [radians per sample]
+#define PHASE_OFFSET 0.0            // Phase offset [radians]
 #define DELAY 10.0f                 // Delay for the first channel [samples] 
-#define DDELAY 1.0f                 // Differential Delay between receiving channels [samples] (sin(45°)*pi= 2.2214)
+#define DDELAY 0.4066f              // Differential Delay between receiving channels [samples] (sin(15°)*0.5*pi= 0.4066 Samples)
 
 // Interface for zmq socket
 #define EXPORT_INTERFACE 'tcp://localhost:5555' 
@@ -157,7 +157,7 @@ int main(int argc, char*argv[])
     // Delay filter parameters
     unsigned int nmax       =   200;            // maximum delay
     unsigned int m          =   cp_len;         // filter semi-length
-    unsigned int npfb       =   100;            // fractional delay resolution
+    unsigned int npfb       =   1000;           // fractional delay resolution
 
     // Apply channel to the generated signal
     std::vector<std::vector<std::complex<float>>> rx_base(NUM_CHANNELS);                 // Buffer to store the received signal for all channels
@@ -221,10 +221,6 @@ int main(int argc, char*argv[])
     cfr.assign(NUM_CHANNELS, std::vector<std::complex<float>>(M, std::complex<float>(0.0f, 0.0f)));   // Initialize the buffer with zeros
     cir.assign(NUM_CHANNELS, std::vector<std::complex<float>>(M, std::complex<float>(0.0f, 0.0f)));   // Initialize the buffer with zeros
 
-    // Synchronized NCO for all channels
-    nco_crcf nco_rx = nco_crcf_create(LIQUID_NCO);
-    nco_crcf_set_frequency(nco_rx, 2*M_PI*CARRIER_FREQUENCY);
-
     // Samplewise synchronization of each channel
     std::vector<std::complex<float>> rx_sample(1);  // create vector of size 1 containing the current sample
     for (unsigned int i = 0; i < rx_base_len; ++i) {
@@ -241,7 +237,7 @@ int main(int argc, char*argv[])
         };
 
         // Synchronize NCOs of all channels to the average NCO frequency and phase
-        //ms.SynchronizeNcos();
+        ms.SynchronizeNcos();
     };
 
     // compute the CIR from the CFR via IFFT
