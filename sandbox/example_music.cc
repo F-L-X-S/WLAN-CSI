@@ -199,6 +199,8 @@ int main(int argc, char*argv[])
         rx_base[i].assign(rx_channel_base, rx_channel_base + rx_base_len);         
     }
 
+    channel_cccf_destroy(base_channel);
+
 
     // ----------------- Synchronization ----------------------
     // callback data
