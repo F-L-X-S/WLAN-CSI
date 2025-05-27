@@ -5,7 +5,7 @@
 # @brief This file contains the implementation of the MUSIC-Algorithm for estimating the Direction-of-arrival (DoA)
 # of a signal impinging on an antenna array. The Data is received via a ZeroMQ socket and is processed in real-time.
 # The received Channel State Information (CSI) is formatted as a matrix with dimensions (size, n_boards, n_rows, n_antennas, subcarriers).
-# The Implementation is based on the ESPARGOS demo project https://github.com/ESPARGOS/pyespargos
+# The MUSIC-Implementation is based on the ESPARGOS demo project https://github.com/ESPARGOS/pyespargos
 # @version 0.1
 # @date 2025-05-20
 
@@ -69,9 +69,10 @@ class MusicSpectrum(PyQt6.QtWidgets.QApplication):
 		self.csi = None
 		self.antennas_per_row = 10
 
-		# Initialize MUSIC scanning angles, steering vectors, ...
+		# Initialize MUSIC scanning angles, steering vectors
+   		# steering vectors are the phases of the received Signal as function of angle theta 
 		self.scanning_angles = np.linspace(-np.pi / 2, np.pi / 2, 180) 
-		self.steering_vectors = np.exp(-1.0j * np.outer(np.pi * np.sin(self.scanning_angles), np.arange(self.antennas_per_row))) #[-pi...pi] in 180 steps
+		self.steering_vectors = np.exp(-1.0j * np.outer(np.pi * np.sin(self.scanning_angles), np.arange(self.antennas_per_row)))
 		self.spatial_spectrum = None
 
 		# Poll CSI from socket
