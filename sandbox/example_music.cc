@@ -25,19 +25,19 @@
  #include <zmq_socket/zmq_socket.h>
 
 // Definition of the transmission-settings 
-#define NUM_SAMPLES 150000          // Total Number of samples to be generated 
+#define NUM_SAMPLES 1000          // Total Number of baseband-samples to be generated 
 #define SYMBOLS_PER_FRAME 3         // Number of data-ofdm-symbols transmitted per frame
 #define FRAME_START 30              // Start position of the ofdm-frame in the sequence
-#define NUM_CHANNELS 10             // Number of channels to be synchronized
-#define CARRIER_FREQUENCY 9600.0f   // Frequency, the Signal is modulated to (2.4GHz/20MHz = 120, M+CP Samples per Symbol (64+16)* 120 -> 9600 Samples per Symbol in 2.4GHz domain)
+#define NUM_CHANNELS 4             // Number of channels to be synchronized
+#define CARRIER_FREQUENCY 7680.0f   // 2.4GHz/20MHz = 120, 64* 120 -> 7680 Samples in 2.4GHz domain
 
 // Definition of the channel impairments
 #define SNR_DB 37.0f                // Signal-to-noise ratio [dB]
 #define NOISE_FLOOR -92.0f          // Noise floor [dB]
 #define CFO 0.00f                   // Carrier frequency offset [radians per sample]
 #define PHASE_OFFSET 0.0            // Phase offset [radians]
-#define DELAY 10.0f                 // Delay for the first channel [samples] 
-#define DDELAY 0.4066f              // Differential Delay between receiving channels [samples] (sin(15°)*0.5*pi= 0.4066 Samples)
+#define DELAY 0.5f                  // Delay for the first channel [samples] 
+#define DDELAY 1.4142f              // Differential Delay between receiving channels [samples] (sin(30°)*2= 1.0 Samples)
 
 // Interface for zmq socket
 #define EXPORT_INTERFACE 'tcp://localhost:5555' 
@@ -135,10 +135,11 @@ int main(int argc, char*argv[])
     }
 
     // ------------------- Upconversion ---------------------
+    float r = (float)(2*M_PI*CARRIER_FREQUENCY/(M));
     // Resample signal to match carrier
-    unsigned int tx_len = (unsigned int)(frame_samples*ceil(CARRIER_FREQUENCY/M));
+    unsigned int tx_len = (unsigned int)(frame_samples*ceil(r));
     std::complex<float> tx[tx_len];
-    msresamp_crcf resamp_tx = msresamp_crcf_create(CARRIER_FREQUENCY/M,60.0);
+    msresamp_crcf resamp_tx = msresamp_crcf_create(r,60.0);
     unsigned int ny;
     msresamp_crcf_execute(resamp_tx, tx_base, frame_samples, tx, &ny);
     msresamp_crcf_destroy(resamp_tx);
@@ -149,7 +150,7 @@ int main(int argc, char*argv[])
     nco_crcf_mix_block_up(nco_tx, tx, tx, tx_len);
     nco_crcf_destroy(nco_tx);                               
 
-    // ------------------- Channel impairments ---------------------
+    // ------------------- Channel impairments and Downconversion ---------------------
     // Create base channel object
     channel_cccf base_channel = channel_cccf_create();
     channel_cccf_add_carrier_offset(base_channel, CFO, PHASE_OFFSET);    // Add Carrier Frequency Offset and Phase Offset
@@ -160,43 +161,54 @@ int main(int argc, char*argv[])
     unsigned int npfb       =   1000;           // fractional delay resolution
 
     // Apply channel to the generated signal
-    std::vector<std::vector<std::complex<float>>> rx_base(NUM_CHANNELS);                 // Buffer to store the received signal for all channels
-    unsigned int rx_base_len = ceil(NUM_SAMPLES*((float)M/CARRIER_FREQUENCY)); 
+    unsigned int rx_base_len = NUM_SAMPLES;
+    unsigned int rx_ch_len = (unsigned int)ceil(r*NUM_SAMPLES);
+    std::vector<std::vector<std::complex<float>>> rx_base(NUM_CHANNELS);    // Buffer to store the received baseband signal for all channels
 
-    for (unsigned int i = 0; i < NUM_CHANNELS; ++i) {
-        std::complex<float> rx_channel[NUM_SAMPLES];                                // Buffer to store the received signal a single channel
-
-        // Insert the transmitted sequence into the longer rx_channel at the specified start position 'TF_SYMBOL_START'   
-        InsertSequence(rx_channel, tx, FRAME_START, tx_len);
-
-        // Add Time delay 
+    for (unsigned int ch = 0; ch < NUM_CHANNELS; ++ch) {
+        // Configure Time delay 
         fdelay_crcf fd = fdelay_crcf_create(nmax, m, npfb);
-        float delay = DELAY+((float)i*DDELAY);
-        fdelay_crcf_set_delay(fd, delay);                                           // Set the delay for respective channel
-        fdelay_crcf_execute_block(fd, tx, NUM_SAMPLES, rx_channel);                 // Delay the signal    
-        fdelay_crcf_destroy(fd);
+        float delay = DELAY+(float)(ch*DDELAY);
+        fdelay_crcf_set_delay(fd, delay);                                          
 
-        // Add channel impairments
+        // Configure channel impairments
         channel_cccf channel = channel_cccf_copy(base_channel);                     // Copy the base channel
         channel_cccf_add_awgn(channel, NOISE_FLOOR, SNR_DB);                        // Set Noise for each channel
-        channel_cccf_execute_block(channel, rx_channel, NUM_SAMPLES, rx_channel);   // Apply channel impairments to the signal          
-        channel_cccf_destroy(channel);
 
-        // ------------------- Downconversion ---------------------
-        // Mix down respective channel to complex baseband
+        // Configure Downconversion to complex baseband
         nco_crcf nco_rx = nco_crcf_create(LIQUID_NCO);
         nco_crcf_set_frequency(nco_rx, 2*M_PI*CARRIER_FREQUENCY);
-        nco_crcf_mix_block_down(nco_rx, rx_channel, rx_channel, NUM_SAMPLES);
-        nco_crcf_destroy(nco_rx);       
         
-        // Resample the received signal 
-        std::complex<float> rx_channel_base[rx_base_len]; // Buffer to store the received signal a single channel
-        msresamp_crcf resamp_rx = msresamp_crcf_create(M/CARRIER_FREQUENCY,60.0);
-        msresamp_crcf_execute(resamp_rx, rx_channel, NUM_SAMPLES, rx_channel_base, &ny);
-        msresamp_crcf_destroy(resamp_rx);
+        // Configure Resampler for Downconversion  
+        std::complex<float> rx_channel_base[rx_base_len];                           // Buffer to store the received signal a single channel
+        msresamp_crcf resamp_rx = msresamp_crcf_create(1/r,60.0);
+
+        // initialize channel buffer 
+        std::vector<std::complex<float>> rx_channel(rx_ch_len);                     // Buffer to store the received modulated signal of a single channel
+
+        // Insert the transmitted sequence into the longer rx_channel at the specified start position 'TF_SYMBOL_START'   
+        InsertSequence(rx_channel.data(), tx, FRAME_START, tx_len);
+
+        // Processing
+        for (unsigned int i = 0; i < rx_ch_len; ++i) {
+            fdelay_crcf_push(fd, rx_channel[i]);
+            fdelay_crcf_execute(fd, &rx_channel[i]);                                // Apply Timedelay
+            channel_cccf_execute(channel, rx_channel[i], &rx_channel[i]);           // Apply channel impairments 
+            nco_crcf_mix_down(nco_rx, rx_channel[i], &rx_channel[i]);               // Apply Downconversion 
+            nco_crcf_step(nco_rx);                                                  // Step Carrier NCO
+        }
+
+        // Resampling to Baseband
+        msresamp_crcf_execute(resamp_rx, rx_channel.data(), rx_ch_len, rx_channel_base, &ny); 
 
         // Copy the received signal to the buffer for the respective channel
-        rx_base[i].assign(rx_channel_base, rx_channel_base + rx_base_len);         
+        rx_base[ch].assign(rx_channel_base, rx_channel_base + rx_base_len);
+
+        // Free Memory 
+        fdelay_crcf_destroy(fd);        
+        channel_cccf_destroy(channel);
+        nco_crcf_destroy(nco_rx);  
+        msresamp_crcf_destroy(resamp_rx); 
     }
 
     channel_cccf_destroy(base_channel);
