@@ -58,8 +58,8 @@
 // Definition of the channel impairments
 #define SNR_DB 37.0f                // Signal-to-noise ratio [dB]
 #define NOISE_FLOOR -92.0f          // Noise floor [dB]
-#define CFO 0.00f                   // Carrier frequency offset [radians per sample]
-#define PHASE_OFFSET 0.0            // Phase offset [radians]
+#define CFO 0.0018f                 // Carrier frequency offset [radians per sample]
+#define PHASE_OFFSET 3.4f           // Phase offset [radians]
 #define DELAY 10.0f                 // Delay for the first channel [samples] 
 #define DDELAY 2.22144f             // Differential Delay between receiving channels [samples] (e.g. sin(45°)*pi= 2.22144 Samples)
 
@@ -158,7 +158,9 @@ int main(int argc, char*argv[])
     }
 
     // ------------------- Upconversion ---------------------
+    // Resampling rate = 2*pi*carrier/baseband
     float r = (float)(2*M_PI*CARRIER_FREQUENCY/(M));
+
     // Resample signal to match carrier
     unsigned int tx_len = (unsigned int)(frame_samples*ceil(r));
     std::complex<float> tx[tx_len];
@@ -176,7 +178,6 @@ int main(int argc, char*argv[])
     // ------------------- Channel impairments and Downconversion ---------------------
     // Create base channel object
     channel_cccf base_channel = channel_cccf_create();
-    channel_cccf_add_carrier_offset(base_channel, CFO, PHASE_OFFSET);    // Add Carrier Frequency Offset and Phase Offset
 
     // Delay filter parameters
     unsigned int nmax       =   200;            // maximum delay
@@ -200,8 +201,9 @@ int main(int argc, char*argv[])
 
         // Configure Downconversion to complex baseband
         nco_crcf nco_rx = nco_crcf_create(LIQUID_NCO);
-        nco_crcf_set_frequency(nco_rx, 2*M_PI*CARRIER_FREQUENCY);
-        
+        nco_crcf_set_frequency(nco_rx, 2*M_PI*CARRIER_FREQUENCY+CFO);
+        nco_crcf_set_phase(nco_rx, PHASE_OFFSET);
+
         // Configure Resampler for Downconversion  
         std::complex<float> rx_channel_base[rx_base_len];                           // Buffer to store the received signal a single channel
         msresamp_crcf resamp_rx = msresamp_crcf_create(1/r,60.0);
@@ -271,7 +273,7 @@ int main(int argc, char*argv[])
         };
 
         // Synchronize NCOs of all channels to the average NCO frequency and phase
-        //ms.SynchronizeNcos();
+        ms.SynchronizeNcos();
     };
 
     // compute the CIR from the CFR via IFFT
