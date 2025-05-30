@@ -2,9 +2,24 @@
  * @file example_music.cc
  * @author Felix Schuelke (flxscode@gmail.com)
  * 
- * @brief This example demonstrates the usage of multiple OFDM frame synchronizers within multisync 
- * for receiving multiple channels with different channel impairments like in an antenna array.
+ * @brief This example demonstrates the usage of multiple OFDM frame synchronizers within the multisync-class
+ * for receiving multiple channels with different channel impairments and time-delays like in an antenna array.
  * The CFR or CIR is exported via ZeroMq to be processed within the MUSIC algorithm in Python for estimating the DOA.
+ * 
+ * 1. Signal Generation in complex baseband:
+ * Creates an OFDM-signal in complex baseband (20MHz) containing the WiFi-preamble and a number of random QPSK-symbols.
+ * 
+ * 2. Upconversion
+ * The modulation is performed by interpolating the baseband with r=2*pi*carrierfrequency/basebandfrequency and mixing up 
+ * each sample of the interpolated signal with a NCO, stepping by a phase of 2*pi*carrierfrequency.
+ * 
+ * 3. Channel impairments and Downconversion
+ * The modulated signal is delayed sample by sample with DELAY+k*DDELAY for each kth channel and unique noise is applied.
+ * After mixing down sample by sample, the signal is resampled back to complex baseband.  
+ * 
+ * 4. Synchronization
+ * All channels are processed by ofdm-framesynchronizers, that are working simultaneously within the multisync.
+ * 
  * The usage of Liquid's DSP-modules is based on https://github.com/jgaeddert/liquid-dsp (Copyright (c) 2007 - 2016 Joseph Gaeddert).
  * 
  * @version 0.1
@@ -25,26 +40,25 @@
  #include <zmq_socket/zmq_socket.h>
 
 // Definition of the transmission-settings 
-#define NUM_SAMPLES 1000          // Total Number of baseband-samples to be generated 
+#define NUM_SAMPLES 1000            // Total Number of baseband-samples to be generated 
 #define SYMBOLS_PER_FRAME 3         // Number of data-ofdm-symbols transmitted per frame
 #define FRAME_START 30              // Start position of the ofdm-frame in the sequence
-#define NUM_CHANNELS 4             // Number of channels to be synchronized
-#define CARRIER_FREQUENCY 7680.0f   // 2.4GHz/20MHz = 120, 64* 120 -> 7680 Samples in 2.4GHz domain
+#define NUM_CHANNELS 4              // Number of channels to be synchronized
+#define CARRIER_FREQUENCY 7718.4f   // 2.412GHz/20MHz = 120.6, 64 * 120.6 = 7718.4 DFT-points in 2.412GHz domain
 
 // Definition of the channel impairments
 #define SNR_DB 37.0f                // Signal-to-noise ratio [dB]
 #define NOISE_FLOOR -92.0f          // Noise floor [dB]
 #define CFO 0.00f                   // Carrier frequency offset [radians per sample]
 #define PHASE_OFFSET 0.0            // Phase offset [radians]
-#define DELAY 0.5f                  // Delay for the first channel [samples] 
-#define DDELAY 1.4142f              // Differential Delay between receiving channels [samples] (sin(30°)*2= 1.0 Samples)
+#define DELAY 10.0f                 // Delay for the first channel [samples] 
+#define DDELAY 2.22144f             // Differential Delay between receiving channels [samples] (e.g. sin(45°)*pi= 2.22144 Samples)
 
 // Interface for zmq socket
 #define EXPORT_INTERFACE 'tcp://localhost:5555' 
 
 // Output file in MATLAB-format to store results
 #define OUTFILE "./matlab/example_music.m" 
-
 
 // custom data type to pass to callback function
 struct callback_data {
@@ -75,7 +89,7 @@ int main(int argc, char*argv[])
     // set the random seed differently for each run
     srand(time(NULL));
 
-    // ---------------------- Signal Generation ----------------------
+    // ---------------------- Signal Generation in complex baseband ----------------------
     // options
     unsigned int M           = 64;      // number of subcarriers 
     unsigned int cp_len      = 16;      // cyclic prefix length (800ns for 20MHz => 16 Sample)
@@ -226,9 +240,6 @@ int main(int argc, char*argv[])
     // Create multi frame synchronizer
     MultiSync<ofdmframesync> ms(NUM_CHANNELS, {M, cp_len, taper_len, p}, callback, userdata);
 
-    // initialize zmq socket for data export 
-    ZmqSender sender("tcp://*:5555");
-
     // Channel frequency response (CFR) and channel impulse response (CIR)
     std::vector<std::vector<std::complex<float>>> cfr(NUM_CHANNELS);   // Multidimensional buffer to store the cfr for all channels
     std::vector<std::vector<std::complex<float>>> cir(NUM_CHANNELS);   // Multidimensional buffer to store the cir for all channels
@@ -251,7 +262,7 @@ int main(int argc, char*argv[])
         };
 
         // Synchronize NCOs of all channels to the average NCO frequency and phase
-        ms.SynchronizeNcos();
+        //ms.SynchronizeNcos();
     };
 
     // compute the CIR from the CFR via IFFT
@@ -280,11 +291,12 @@ int main(int argc, char*argv[])
         cir[ch] = cir_temp;
     }
 
-    // send the CIR to zmq socket  
-    sender.send(cir);        
-
     // destroy objects
     ofdmframegen_destroy(fg);    
+
+    // ZMQ socket for data export 
+    ZmqSender sender("tcp://*:5555");
+    sender.send(cir);        
 
 // ----------------- MATLAB output ----------------------
 MatlabExport m_file(OUTFILE);
