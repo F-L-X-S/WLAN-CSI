@@ -4,21 +4,30 @@
  * 
  * @brief This example demonstrates the usage of multiple OFDM frame synchronizers within the multisync-class
  * for receiving multiple channels with different channel impairments and time-delays like in an antenna array.
- * The CFR or CIR is exported via ZeroMq to be processed within the MUSIC algorithm in Python for estimating the DOA.
+ * The CFR or CIR is exported via ZeroMq to be processed within the MUSIC algorithm in Python for estimating the DoA.
  * 
- * 1. Signal Generation in complex baseband:
+ * The simulated timedelay of the channel (and the difference of the delay between spatially distributed receivers) is 
+ * parameterised by DELAY and DDELY. The differential delay in samples between two channels (DDELAY) in an Uniform Linear Array (ULA)
+ * with lambda/2 spacing is defined by tau=pi*sin(theta) whereas pi results from resampling with 2*pi*CARRIER_FREQUENCY. 
+ * 
+ * Run music/music_spectrum.py before execution to estimate the DoA using multiple signal classification.
+ * 
+ * Structure:
+ * 1. Signal Generation in complex baseband
  * Creates an OFDM-signal in complex baseband (20MHz) containing the WiFi-preamble and a number of random QPSK-symbols.
  * 
  * 2. Upconversion
  * The modulation is performed by interpolating the baseband with r=2*pi*carrierfrequency/basebandfrequency and mixing up 
- * each sample of the interpolated signal with a NCO, stepping by a phase of 2*pi*carrierfrequency.
+ * each sample of the interpolated signal with a NCO, stepping by a phase of 2*pi*CARRIER_FREQUENCY.
  * 
  * 3. Channel impairments and Downconversion
  * The modulated signal is delayed sample by sample with DELAY+k*DDELAY for each kth channel and unique noise is applied.
  * After mixing down sample by sample, the signal is resampled back to complex baseband.  
  * 
  * 4. Synchronization
- * All channels are processed by ofdm-framesynchronizers, that are working simultaneously within the multisync.
+ * All channels are processed by ofdm-framesynchronizers, working simultaneously within the multisync. 
+ * The Channel-Frequency-Response and the received symbols are stored in callback-data. The Channel-impulse-response is calculated by an IDFT.
+ * Note, that the CFR is shifted (ordered by  1,..., (M/2-1),-(M/2),...,-1,0).
  * 
  * The usage of Liquid's DSP-modules is based on https://github.com/jgaeddert/liquid-dsp (Copyright (c) 2007 - 2016 Joseph Gaeddert).
  * 
