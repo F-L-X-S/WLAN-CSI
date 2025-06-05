@@ -21,8 +21,11 @@
 
 #include <matlab_export/matlab_export.h>
 #include <multisync/multisync.h>
+#include <zmq_socket/zmq_socket.h>
 
+#define NUM_FRAMES 4                      // Number of frames to receive before stopping    
 #define OUTFILE "./matlab/example_usrp.m"  // Output file in MATLAB-format to store results
+#define EXPORT_INTERFACE 'tcp://localhost:5555' // Interface for zmq socket
 
 
 // custom data type to pass to callback function
@@ -59,7 +62,8 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     std::string ref("internal");
 
     double rate(25e6);
-    double freq(2447e6);
+    double freq(2220e6);
+    double lo_freq(227e6);  // USRP tunes 2220 MHz -> 2447 MHz - 227 MHz = 2220 MHz
     double gain(20);
     double bw(40e6);
 
@@ -83,8 +87,9 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     std::cout << boost::format("Actual RX Rate: %f Msps...") % (usrp->get_rx_rate() / 1e6) << std::endl << std::endl;
 
     // set freq
-    std::cout << boost::format("Setting RX Freq: %f MHz...") % (freq / 1e6) << std::endl;
-    uhd::tune_request_t tune_request(freq);
+    uhd::tune_request_t tune_request(freq, lo_freq);  // create a tune request with the desired frequency and local oscillator offset
+    std::cout << boost::format("Tune Policy: %f") % (tune_request.rf_freq_policy) << std::endl;
+    std::cout << boost::format("Setting RX Freq: %f MHz...") % (tune_request.target_freq / 1e6) << std::endl;
     usrp->set_rx_freq(tune_request);
     std::cout << boost::format("Actual RX Freq: %f MHz...") % (usrp->get_rx_freq() / 1e6) << std::endl << std::endl;
 
@@ -104,8 +109,12 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     std::cout << boost::format("Actual RX Antenna: %s") % usrp->get_rx_antenna() << std::endl << std::endl;
 
     // callback data
-    callback_data cb_data;
-    void* userdata[] = { &cb_data };
+    struct callback_data cb_data[NUM_FRAMES]; 
+    void* userdata[NUM_FRAMES];
+
+    // Array of Pointers to CB-Data 
+    for (unsigned int i = 0; i < NUM_FRAMES; ++i)
+        userdata[i] = &cb_data[i];
         
     // Create multi frame synchronizer
     unsigned int M           = 64;      // number of subcarriers 
@@ -113,10 +122,11 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     unsigned int taper_len   = 4;       // window taper length 
     unsigned char p[M];                 // subcarrier allocation array
     ofdmframe_init_default_sctype(M, p);
-    MultiSync<ofdmframesync> ms(1, {M, cp_len, taper_len, p}, callback, userdata);
+    MultiSync<ofdmframesync> ms(NUM_FRAMES, {M, cp_len, taper_len, p}, callback, userdata);
 
     // CFR Buffer 
-    std::vector<std::complex<float>> cfr(M, std::complex<float>(0.0f, 0.0f));
+    std::vector<std::vector<std::complex<float>>> cfr(NUM_FRAMES);
+    cfr.assign(NUM_FRAMES, std::vector<std::complex<float>>(M, std::complex<float>(0.0f, 0.0f)));
 
     // Receive stream
     uhd::stream_args_t stream_args("fc32", "sc16");                             // convert internal sc16 to complex float
@@ -135,38 +145,47 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     // start receiving samples
     usrp->issue_stream_cmd(uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS);
     std::cout << "Receiving..." << std::endl;
-    int receiving = 1;
+    unsigned int num_frames = 0;  
 
-    while (receiving) {
+    while (num_frames<NUM_FRAMES) {
         size_t num_rx_samps = rx_stream->recv(&buff.front(), buff.size(), md);
         std::vector<std::complex<float>> rx_sample(1);  // create vector of size 1 containing the current sample
         for (unsigned int i = 0; i < num_rx_samps; ++i) {
                 // Downsampling to 20MHz 
                 resamp_crcf_execute(resampler, buff[i], &rx_sample[0], &num_written);
                 // execute the respective synchronizer        
-                ms.Execute(0, &rx_sample);
+                ms.Execute(num_frames, &rx_sample);
 
                 // Store the CFR 
-                if (cb_data.buffer.size() && !cb_data.cfr.size()){
-                    ms.GetCfr(0, &cb_data.cfr, M);                              // Write cfr to callback data
-                    cfr.assign(cb_data.cfr.begin(), cb_data.cfr.end());         // Copy the CFR to the buffer  
-                    std::cout << "Captured CFR!" << std::endl;
-                    receiving = 0; // Stop receiving after the first CFR is detected
+                if (cb_data[num_frames].buffer.size() && cb_data[num_frames].cfr.empty()){
+                    ms.GetCfr(num_frames, &cb_data[num_frames].cfr, M);                                         // Write cfr to callback data
+                    cfr[num_frames].assign(cb_data[num_frames].cfr.begin(), cb_data[num_frames].cfr.end());     // Copy the CFR to the buffer  
+                    std::cout << "Captured CFR!\n" << std::endl;
+                    num_frames++;                                            
                 };
                 // Synchronize NCOs of all channels to the average NCO frequency and phase
                 ms.SynchronizeNcos();
+
+                // Stop receiving if we have enough frames
+                if (num_frames >= NUM_FRAMES) break;
         };
     };
 
     usrp->issue_stream_cmd(uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS);
-    std::cout << "Stopped receiving..." << std::endl;
+    std::cout << "Stopped receiving...\n" << std::endl;
+
+// ZMQ socket for data export 
+ZmqSender sender("tcp://*:5555");
+sender.send(cfr); 
 
 // ----------------- MATLAB output ----------------------
 MatlabExport m_file(OUTFILE);
 
-// Export CFR to MATLAB file
-std::string ch_suffix = std::to_string(1);
-m_file.Add(cfr, "cfr_" + ch_suffix);
+// Export CFRs to MATLAB file
+for (unsigned int i = 0; i < NUM_FRAMES; ++i) {
+    std::string suffix = std::to_string(i);
+    m_file.Add(cfr[i], "cfr_" + suffix);
+}
 
 // Add combined plot-commands to the MATLAB file
 std::stringstream matlab_cmd;
@@ -174,21 +193,29 @@ std::stringstream matlab_cmd;
 matlab_cmd << "figure;";
 // CFR Magnitude
 matlab_cmd << "subplot(2,1,1); hold on;";
-matlab_cmd << "plot(abs(cfr_" << ch_suffix << "), 'DisplayName', 'RX-Channel " << ch_suffix << "');";
+for (unsigned int i = 0; i < NUM_FRAMES; ++i) {
+    std::string suffix = std::to_string(i);
+    matlab_cmd << "plot(abs(cfr_" << suffix << "), 'DisplayName', 'RX-Channel " << suffix << "');";
+}
 matlab_cmd << "title('Channel Frequency Response Gain'); legend; grid on;";
 matlab_cmd << std::endl;
 
 // CFR Phase
 matlab_cmd << "subplot(2,1,2); hold on;";
-matlab_cmd << "plot(angle(cfr_" << ch_suffix << "), 'DisplayName', 'RX-Channel " << ch_suffix << "');";
+for (unsigned int i = 0; i < NUM_FRAMES; ++i) {
+    std::string suffix = std::to_string(i);
+    matlab_cmd << "plot(angle(cfr_" << suffix << "), 'DisplayName', 'RX-Channel " << suffix << "');";
+}
 matlab_cmd << "title('Channel Frequency Response Phase'); legend; grid on;";
 matlab_cmd << std::endl;
 
 // CFR in Complex 
 matlab_cmd << "figure;";
-matlab_cmd << "subplot(1,2,1); hold on;";
-matlab_cmd << "plot(real(cfr_" << ch_suffix << "), imag(cfr_" << ch_suffix
-            << "), '.', 'DisplayName', 'RX-Channel " << ch_suffix << "');";
+for (unsigned int i = 0; i < NUM_FRAMES; ++i) {
+    std::string suffix = std::to_string(i);
+    matlab_cmd << "plot(real(cfr_" << suffix << "), imag(cfr_" << suffix
+               << "), '.', 'DisplayName', 'RX-Channel " << suffix << "');";
+}
 matlab_cmd << "title('CFR'); xlabel('Real'); ylabel('Imag'); axis equal; legend; grid on;";
 matlab_cmd << std::endl;
 
