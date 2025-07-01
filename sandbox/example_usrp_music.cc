@@ -15,6 +15,7 @@
 #include <uhd/exception.hpp>
 #include <uhd/types/tune_request.hpp>
 #include <boost/program_options.hpp>
+#include <boost/algorithm/string.hpp>
 #include <boost/format.hpp>
 #include <boost/thread.hpp>
 #include <iostream>
@@ -23,9 +24,9 @@
 #include <multisync/multisync.h>
 #include <zmq_socket/zmq_socket.h>
 
-#define NUM_FRAMES 4                      // Number of frames to receive before stopping    
-#define OUTFILE "./matlab/example_usrp_music.m"  // Output file in MATLAB-format to store results
-#define EXPORT_INTERFACE 'tcp://localhost:5555' // Interface for zmq socket
+#define NUM_FRAMES 10                               // Number of frames to receive before stopping    
+#define OUTFILE "./matlab/example_usrp_music.m"     // Output file in MATLAB-format to store results
+#define EXPORT_INTERFACE 'tcp://localhost:5555'     // Interface for zmq socket
 
 
 // custom data type to pass to callback function
@@ -65,6 +66,11 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     usrp->set_clock_source("internal", 0);  // internal clock source for device 0 
     usrp->set_time_source("mimo", 1);       // mimo clock source for device 1
     usrp->set_clock_source("mimo", 1);      // mimo clock source for device 1
+    usrp->set_time_now(uhd::time_spec_t(0.0), 0);   // set time for device 0 
+    usrp->set_time_now(uhd::time_spec_t(0.0), 1);   // set time for device 1
+    
+    //sleep a bit while the slave locks its time to the master
+    boost::this_thread::sleep(boost::posix_time::milliseconds(100));
 
     //always select the subdevice first, the channel mapping affects the other settings
     usrp->set_rx_subdev_spec(uhd::usrp::subdev_spec_t("A:0"), 0);  //set the device 0 to use the A RX frontend (RX channel 0)
@@ -119,48 +125,99 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     std::vector<std::vector<std::complex<float>>> cfr(NUM_FRAMES);
     cfr.assign(NUM_FRAMES, std::vector<std::complex<float>>(M, std::complex<float>(0.0f, 0.0f)));
 
-    // Receive stream
-    uhd::stream_args_t stream_args("fc32", "sc16");                             // convert internal sc16 to complex float
-    uhd::rx_streamer::sptr rx_stream = usrp->get_rx_stream(stream_args);        // cretae a receive stream 
-    size_t max_samps = rx_stream->get_max_num_samps();                         
-    
-    // RX Stream buffer 
-    std::vector<std::complex<float>> buff(max_samps);
-    uhd::rx_metadata_t md;
-
     // Resampler 40MHz to 20MHz 
     float resamp_factor = 20e6 / 40e6; // signal-bandwidth/usrp-bandwidth  
     unsigned int num_written = 0; 
-    resamp_crcf resampler = resamp_crcf_create(resamp_factor, 12, 0.45f, 60.0f, 32);
-
+    resamp_crcf resamplers[2];
+    for (int i = 0; i < 2; i++) {
+        resamplers[i] = resamp_crcf_create(resamp_factor, 12, 0.45f, 60.0f, 32);
+    }
+     
     // Receive stream confguration
-    uhd::stream_cmd_t stream_cmd(uhd::stream_cmd_t::STREAM_MODE_NUM_SAMPS_AND_DONE);
-    stream_cmd.num_samps = 100000;                                                      // number of samples to receive per frame
-    stream_cmd.stream_now = false;
-    uhd::time_spec_t time_to_recv = usrp->get_time_now(0) + uhd::time_spec_t(1.0);      // Start synced receiving after 1 second 
-    stream_cmd.time_spec = time_to_recv;
-    usrp->issue_stream_cmd(stream_cmd);
-    std::cout << "Receiving..." << std::endl;
-    
-    unsigned int num_frames = 0;  
-    while (num_frames<NUM_FRAMES) {
-        size_t num_rx_samps = rx_stream->recv(&buff.front(), buff.size(), md);
-        std::vector<std::complex<float>> rx_sample(1);  // create vector of size 1 containing the current sample
-        for (unsigned int i = 0; i < num_rx_samps; ++i) {
-                // Downsampling to 20MHz 
-                resamp_crcf_execute(resampler, buff[i], &rx_sample[0], &num_written);
-                // execute the respective synchronizer        
-                ms.Execute(num_frames, &rx_sample);
+    uhd::stream_args_t stream_args("fc32", "sc16");                                     // convert internal sc16 to complex float 32
+    stream_args.channels = {0,1};                                                       // Set the channels to receive from (0 and 1)
+    uhd::rx_streamer::sptr rx_stream = usrp->get_rx_stream(stream_args);                // cretae a receive stream 
+    size_t max_samps = rx_stream->get_max_num_samps();  
 
-                // Store the CFR 
-                if (cb_data[num_frames].buffer.size() && cb_data[num_frames].cfr.empty()){
-                    ms.GetCfr(num_frames, &cb_data[num_frames].cfr, M);                                         // Write cfr to callback data
-                    cfr[num_frames].assign(cb_data[num_frames].cfr.begin(), cb_data[num_frames].cfr.end());     // Copy the CFR to the buffer  
-                    std::cout << "Captured CFR!\n" << std::endl;
-                    num_frames++;                                            
+    // Allocate RX Stream buffer  
+    std::vector<std::vector<std::complex<float> > > buffs(
+        usrp->get_rx_num_channels(), std::vector<std::complex<float> >(max_samps)
+    );
+    std::vector<std::complex<float> *> buff_ptrs;   //vector of pointers to point to each of the channel buffers
+    for (size_t i = 0; i < buffs.size(); i++) buff_ptrs.push_back(&buffs[i].front());
+
+    // Stream command
+    uhd::stream_cmd_t stream_cmd(uhd::stream_cmd_t::STREAM_MODE_NUM_SAMPS_AND_DONE);
+    stream_cmd.num_samps = max_samps;                                                   // number of samples to receive per frame
+    stream_cmd.stream_now = false;   
+
+    // Start receiving samples 
+    uhd::rx_metadata_t md;                      // Metadata Buffer for recv()
+    unsigned int num_frames = 0;                // received frames counter  
+    double seconds_in_future = 0.05;            // delay between receive cycles in seconds  
+    double timeout = seconds_in_future+0.02;     //timeout (delay before receive + padding)
+
+    // ZMQ socket for data export 
+    ZmqSender sender("tcp://*:5555");
+
+    while (num_frames<NUM_FRAMES) {
+        // Issue stream command to start receiving
+        stream_cmd.time_spec = usrp->get_time_now() + uhd::time_spec_t(seconds_in_future);  // set the time spec to start receiving in the future
+        usrp->issue_stream_cmd(stream_cmd);
+
+        //receive a single packet from USRPs
+        size_t num_rx_samps = rx_stream->recv(
+            buff_ptrs, max_samps, md, timeout
+        );
+
+        std::cout << boost::format("Received %d samples...") % num_rx_samps << std::endl;
+
+        //handle the error code
+        if (md.error_code == uhd::rx_metadata_t::ERROR_CODE_TIMEOUT) {
+            std::cout << "Timeout while receiving samples..." << std::endl;
+            break;
+        }
+        if (md.error_code != uhd::rx_metadata_t::ERROR_CODE_NONE){
+            throw std::runtime_error(str(boost::format(
+                "Receiver error %s"
+            ) % md.strerror()));
+        }
+
+        // Detect Packets 
+        std::vector<std::complex<float>> rx_sample(1); 
+        for (unsigned int i = 0; i < num_rx_samps; ++i) {
+                // Process Channel 0
+                resamp_crcf_execute(resamplers[0], buff_ptrs[0][i], &rx_sample[0], &num_written);   // Downsampling to 20MHz 
+                ms.Execute(0, &rx_sample);                                                          // Execute Synchronizer 
+
+                if (cb_data[0].buffer.size() && cb_data[0].cfr.empty()){                            // Store the CFR 
+                    ms.GetCfr(0, &cb_data[0].cfr, M);                                               // Write cfr to callback data
+                    cfr[0].assign(cb_data[0].cfr.begin(), cb_data[0].cfr.end());                    // Copy the CFR to the buffer  
+                    std::cout << "Captured CFR for channel 0!\n" << std::endl;                                        
                 };
+
+                // Process Channel 1
+                resamp_crcf_execute(resamplers[1], buff_ptrs[1][i], &rx_sample[0], &num_written);   // Downsampling to 20MHz 
+                ms.Execute(1, &rx_sample);                                                          // Execute Synchronizer                 
+
+                if (cb_data[1].buffer.size() && cb_data[1].cfr.empty()){                            // Store the CFR 
+                    ms.GetCfr(1, &cb_data[1].cfr, M);                                               // Write cfr to callback data
+                    cfr[1].assign(cb_data[1].cfr.begin(), cb_data[1].cfr.end());                    // Copy the CFR to the buffer  
+                    std::cout << "Captured CFR for channel 1!\n" << std::endl;
+                                                               
+                };
+
                 // Synchronize NCOs of all channels to the average NCO frequency and phase
                 ms.SynchronizeNcos();
+
+                // Export CFR to ZMQ socket
+                if (!cb_data[0].cfr.empty() && !cb_data[1].cfr.empty()){
+                    sender.send(cfr); 
+                    cfr[0].clear();  // Clear the CFR buffer for channel 0
+                    cfr[1].clear();  // Clear the CFR buffer for channel 1
+                    std::cout << "Exported CFRs to ZMQ!\n" << std::endl;
+                    num_frames++;
+                }
 
                 // Stop receiving if we have enough frames
                 if (num_frames >= NUM_FRAMES) break;
@@ -169,10 +226,6 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
 
     usrp->issue_stream_cmd(uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS);
     std::cout << "Stopped receiving...\n" << std::endl;
-
-// ZMQ socket for data export 
-ZmqSender sender("tcp://*:5555");
-sender.send(cfr); 
 
 // ----------------- MATLAB output ----------------------
 MatlabExport m_file(OUTFILE);
