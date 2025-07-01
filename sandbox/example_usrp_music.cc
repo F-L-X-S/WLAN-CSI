@@ -75,7 +75,6 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     std::cout << boost::format("Device 0 RX Rate: %f Msps...") % (usrp->get_rx_rate(0) / 1e6) << std::endl << std::endl;
     std::cout << boost::format("Device 1 RX Rate: %f Msps...") % (usrp->get_rx_rate(1) / 1e6) << std::endl << std::endl;
 
-
     // set freq
     uhd::tune_request_t tune_request(2220e6, 227e6);  // create a tune request with the desired frequency and local oscillator offset
     std::cout << boost::format("Tune Policy: %f") % (tune_request.rf_freq_policy) << std::endl;
@@ -83,7 +82,6 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     usrp->set_rx_freq(tune_request, 1);
     std::cout << boost::format("Device 0 RX Freq: %f MHz...") % (usrp->get_rx_freq(0) / 1e6) << std::endl << std::endl;
     std::cout << boost::format("Device 1 RX Freq: %f MHz...") % (usrp->get_rx_freq(1) / 1e6) << std::endl << std::endl;
-
 
     // set the rf gain
     usrp->set_rx_gain(20, 0);
@@ -96,7 +94,6 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     usrp->set_rx_bandwidth(40e6, 1);
     std::cout << boost::format("Device 0 RX Bandwidth: %f MHz...") % (usrp->get_rx_bandwidth(0) / 1e6) << std::endl << std::endl;
     std::cout << boost::format("Device 1 RX Bandwidth: %f MHz...") % (usrp->get_rx_bandwidth(1) / 1e6) << std::endl << std::endl;
-
 
     // set the antenna
     usrp->set_rx_antenna("RX2", 0);
@@ -136,11 +133,16 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     unsigned int num_written = 0; 
     resamp_crcf resampler = resamp_crcf_create(resamp_factor, 12, 0.45f, 60.0f, 32);
 
-    // start receiving samples
-    usrp->issue_stream_cmd(uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS);
+    // Receive stream confguration
+    uhd::stream_cmd_t stream_cmd(uhd::stream_cmd_t::STREAM_MODE_NUM_SAMPS_AND_DONE);
+    stream_cmd.num_samps = 100000;                                                      // number of samples to receive per frame
+    stream_cmd.stream_now = false;
+    uhd::time_spec_t time_to_recv = usrp->get_time_now(0) + uhd::time_spec_t(1.0);      // Start synced receiving after 1 second 
+    stream_cmd.time_spec = time_to_recv;
+    usrp->issue_stream_cmd(stream_cmd);
     std::cout << "Receiving..." << std::endl;
+    
     unsigned int num_frames = 0;  
-
     while (num_frames<NUM_FRAMES) {
         size_t num_rx_samps = rx_stream->recv(&buff.front(), buff.size(), md);
         std::vector<std::complex<float>> rx_sample(1);  // create vector of size 1 containing the current sample
