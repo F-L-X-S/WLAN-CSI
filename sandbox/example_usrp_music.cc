@@ -19,14 +19,23 @@
 #include <boost/format.hpp>
 #include <boost/thread.hpp>
 #include <iostream>
+#include <csignal>
+#include <atomic>
 
 #include <matlab_export/matlab_export.h>
 #include <multisync/multisync.h>
 #include <zmq_socket/zmq_socket.h>
 
-#define NUM_FRAMES 10                               // Number of frames to receive before stopping    
+#define NUM_CHANNELS 2                              // Number of Channels (USRP-devices)   
 #define OUTFILE "./matlab/example_usrp_music.m"     // Output file in MATLAB-format to store results
 #define EXPORT_INTERFACE 'tcp://localhost:5555'     // Interface for zmq socket
+
+// Signal handler to stop by keaboard interrupt
+std::atomic<bool> stop_signal_called(false);
+
+void sig_int_handler(int) {
+    stop_signal_called.store(true);
+}
 
 
 // custom data type to pass to callback function
@@ -54,6 +63,7 @@ return 0;
 
 int UHD_SAFE_MAIN(int argc, char *argv[]) {
     uhd::set_thread_priority_safe();
+    std::signal(SIGINT, &sig_int_handler);
 
    // Receiver settings 
     unsigned long int ADC_RATE = 100e6;
@@ -69,12 +79,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     double rx_resamp_rate = 0.5* rx_rate / usrp_rx_rate;
 
 
-    //create a multi usrp device
-    // uhd::device_addr_t dev_addr;
-    // dev_addr["addr0"] = "192.168.10.3";
-    // dev_addr["addr1"] = "192.168.168.2";
-    // std::cout << std::endl;
-    //uhd::usrp::multi_usrp::sptr usrp = uhd::usrp::multi_usrp::make(dev_addr);
+    //create USRP devices
     std::string device_args_1("addr=192.168.10.3");
     uhd::usrp::multi_usrp::sptr usrp_1 = uhd::usrp::multi_usrp::make(device_args_1);
     std::string device_args_2("addr=192.168.168.2");
@@ -114,9 +119,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     std::cout << boost::format("Device 0 RX Gain: %f dB...") % usrp_1->get_rx_gain(0) << std::endl << std::endl;
     std::cout << boost::format("Device 1 RX Gain: %f dB...") % usrp_2->get_rx_gain(0) << std::endl << std::endl;
 
-    // set the IF filter bandwidth
-    // usrp->set_rx_bandwidth(40e6, 0);
-    // usrp->set_rx_bandwidth(40e6, 1);
+    // Print Bandwidth 
     std::cout << boost::format("Device 0 RX Bandwidth: %f MHz...") % (usrp_1->get_rx_bandwidth(0) / 1e6) << std::endl << std::endl;
     std::cout << boost::format("Device 1 RX Bandwidth: %f MHz...") % (usrp_2->get_rx_bandwidth(0) / 1e6) << std::endl << std::endl;
 
@@ -125,11 +128,11 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     usrp_2->set_rx_antenna("RX2", 0);
 
     // callback data
-    struct callback_data cb_data[NUM_FRAMES]; 
-    void* userdata[NUM_FRAMES];
+    struct callback_data cb_data[NUM_CHANNELS]; 
+    void* userdata[NUM_CHANNELS];
 
     // Array of Pointers to CB-Data 
-    for (unsigned int i = 0; i < NUM_FRAMES; ++i)
+    for (unsigned int i = 0; i < NUM_CHANNELS; ++i)
         userdata[i] = &cb_data[i];
         
     // Create multi frame synchronizer
@@ -138,13 +141,13 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     unsigned int taper_len   = 4;       // window taper length 
     unsigned char p[M];                 // subcarrier allocation array
     ofdmframe_init_default_sctype(M, p);
-    MultiSync<ofdmframesync> ms(NUM_FRAMES, {M, cp_len, taper_len, p}, callback, userdata);
+    MultiSync<ofdmframesync> ms(NUM_CHANNELS, {M, cp_len, taper_len, p}, callback, userdata);
 
     // CFR Buffer 
-    std::vector<std::vector<std::complex<float>>> cfr(NUM_FRAMES);
-    cfr.assign(NUM_FRAMES, std::vector<std::complex<float>>(M, std::complex<float>(0.0f, 0.0f)));
+    std::vector<std::vector<std::complex<float>>> cfr(NUM_CHANNELS);
+    cfr.assign(NUM_CHANNELS, std::vector<std::complex<float>>(M, std::complex<float>(0.0f, 0.0f)));
 
-    // Resampler 40MHz to 20MHz  
+    // Resamplers
     unsigned int num_written = 0; 
     resamp_crcf resamplers[2];
     for (int i = 0; i < 2; i++) {
@@ -152,15 +155,13 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     }
      
     // Receive stream confguration
-    uhd::stream_args_t stream_args("fc32", "sc16");                                     // convert internal sc16 to complex float 32
-    //stream_args.channels = {0,1};                                                       // Set the channels to receive from (0 and 1)
+    uhd::stream_args_t stream_args("fc32", "sc16");                                         // convert internal sc16 to complex float 32
     uhd::rx_streamer::sptr rx_stream_1 = usrp_1->get_rx_stream(stream_args);                // cretae a receive stream 
     uhd::rx_streamer::sptr rx_stream_2 = usrp_2->get_rx_stream(stream_args);                // cretae a receive stream 
     size_t max_samps = rx_stream_1->get_max_num_samps();  
 
     // Allocate RX Stream buffer  
     std::vector<std::vector<std::complex<float> > > buffs(
-        // usrp->get_rx_num_channels(), std::vector<std::complex<float> >(max_samps)
         3, std::vector<std::complex<float> >(max_samps)
     );
     std::vector<std::complex<float> *> buff_ptrs;   //vector of pointers to point to each of the channel buffers
@@ -170,30 +171,27 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     ZmqSender sender("tcp://*:5555");
 
     // Start receiving samples 
-    uhd::rx_metadata_t md;                      // Metadata Buffer for recv()
-    unsigned int num_frames = 0;                // received frames counter  
+    uhd::rx_metadata_t md;                      // Metadata Buffer for recv
     double seconds_in_future = 1.0;            // delay between receive cycles in seconds  
     double timeout = seconds_in_future+0.2;     //timeout (delay before receive + padding)
 
     // Stream command
     uhd::stream_cmd_t stream_cmd(uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS);
     stream_cmd.num_samps = max_samps;                                                   // number of samples to receive per frame
-    stream_cmd.stream_now = true;  
+    stream_cmd.stream_now = false;  
     stream_cmd.time_spec = usrp_1->get_time_now() + uhd::time_spec_t(seconds_in_future);  // set the time spec to start receiving in the future
     usrp_1->issue_stream_cmd(stream_cmd); 
     usrp_2->issue_stream_cmd(stream_cmd); 
 
-    while (num_frames<NUM_FRAMES) {
-        //receive a single packet from USRPs
-        // size_t num_rx_samps = rx_stream_1->recv(
-        //     buff_ptrs, max_samps, md, timeout
-        // );
-        size_t num_rx_samps_1 = rx_stream_1->recv(&buffs[0].front(), buffs[0].size(), md);
-        size_t num_rx_samps_2 = rx_stream_2->recv(&buffs[1].front(), buffs[1].size(), md);
+    while (!stop_signal_called.load()) {
+        std::vector<size_t> num_rx_samps(NUM_CHANNELS);
+        // Receive single packet from USRPs
+        num_rx_samps[0] = rx_stream_1->recv(&buffs[0].front(), buffs[0].size(), md);
+        num_rx_samps[1] = rx_stream_2->recv(&buffs[1].front(), buffs[1].size(), md);
 
         // Detect Packets 
         std::vector<std::complex<float>> rx_sample(1); 
-        for (unsigned int i = 0; i < num_rx_samps_1; ++i) {
+        for (unsigned int i = 0; i < num_rx_samps[0]; ++i) {
                 // Process Channel 0
                 resamp_crcf_execute(resamplers[0], buff_ptrs[0][i], &rx_sample[0], &num_written);   // Downsampling to 20MHz 
                 ms.Execute(0, &rx_sample);                                                          // Execute Synchronizer 
@@ -201,10 +199,12 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
                 if (cb_data[0].buffer.size() && cb_data[0].cfr.empty()){                            // Store the CFR 
                     ms.GetCfr(0, &cb_data[0].cfr, M);                                               // Write cfr to callback data
                     cfr[0].assign(cb_data[0].cfr.begin(), cb_data[0].cfr.end());                    // Copy the CFR to the buffer  
-                    std::cout << "Captured CFR for channel 0!\n" << std::endl;                                        
+                    std::cout << "Captured CFR for channel 0!\n" << std::endl;      
+                    std::cout << "Samples channel 0: " << num_rx_samps[0] << std::endl;
+                    std::cout << "Samples channel 1: " << num_rx_samps[1] << std::endl;
                 };
         };
-        for (unsigned int i = 0; i < num_rx_samps_1; ++i) {
+        for (unsigned int i = 0; i < num_rx_samps[1]; ++i) {
                 // Process Channel 1
                 resamp_crcf_execute(resamplers[1], buff_ptrs[1][i], &rx_sample[0], &num_written);   // Downsampling to 20MHz 
                 ms.Execute(1, &rx_sample);                                                          // Execute Synchronizer                 
@@ -213,6 +213,8 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
                     ms.GetCfr(1, &cb_data[1].cfr, M);                                               // Write cfr to callback data
                     cfr[1].assign(cb_data[1].cfr.begin(), cb_data[1].cfr.end());                    // Copy the CFR to the buffer  
                     std::cout << "Captured CFR for channel 1!\n" << std::endl;
+                    std::cout << "Samples channel 0: " << num_rx_samps[0] << std::endl;
+                    std::cout << "Samples channel 1: " << num_rx_samps[1] << std::endl;
                                                                
                 };
             };
@@ -223,15 +225,12 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
         // Export CFR to ZMQ socket
         if (!cb_data[0].cfr.empty() && !cb_data[1].cfr.empty()){
             sender.send(cfr); 
-            cfr[0].clear();  // Clear the CFR buffer for channel 0
-            cfr[1].clear();  // Clear the CFR buffer for channel 1
+            // cfr[0].clear();  // Clear the CFR buffer for channel 0
+            // cfr[1].clear();  // Clear the CFR buffer for channel 1
             std::cout << "Exported CFRs to ZMQ!\n" << std::endl;
-            num_frames++;
-        }
-
-        // Stop receiving if we have enough frames
-        if (num_frames >= NUM_FRAMES) break;
+            break;
         };
+    };
 
     usrp_1->issue_stream_cmd(uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS);
     usrp_2->issue_stream_cmd(uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS);
@@ -241,7 +240,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
 MatlabExport m_file(OUTFILE);
 
 // Export CFRs to MATLAB file
-for (unsigned int i = 0; i < NUM_FRAMES; ++i) {
+for (unsigned int i = 0; i < NUM_CHANNELS; ++i) {
     std::string suffix = std::to_string(i);
     m_file.Add(cfr[i], "cfr_" + suffix);
 }
@@ -252,7 +251,7 @@ std::stringstream matlab_cmd;
 matlab_cmd << "figure;";
 // CFR Magnitude
 matlab_cmd << "subplot(2,1,1); hold on;";
-for (unsigned int i = 0; i < NUM_FRAMES; ++i) {
+for (unsigned int i = 0; i < NUM_CHANNELS; ++i) {
     std::string suffix = std::to_string(i);
     matlab_cmd << "plot(abs(cfr_" << suffix << "), 'DisplayName', 'RX-Channel " << suffix << "');";
 }
@@ -261,7 +260,7 @@ matlab_cmd << std::endl;
 
 // CFR Phase
 matlab_cmd << "subplot(2,1,2); hold on;";
-for (unsigned int i = 0; i < NUM_FRAMES; ++i) {
+for (unsigned int i = 0; i < NUM_CHANNELS; ++i) {
     std::string suffix = std::to_string(i);
     matlab_cmd << "plot(angle(cfr_" << suffix << "), 'DisplayName', 'RX-Channel " << suffix << "');";
 }
@@ -270,7 +269,7 @@ matlab_cmd << std::endl;
 
 // CFR in Complex 
 matlab_cmd << "figure;";
-for (unsigned int i = 0; i < NUM_FRAMES; ++i) {
+for (unsigned int i = 0; i < NUM_CHANNELS; ++i) {
     std::string suffix = std::to_string(i);
     matlab_cmd << "plot(real(cfr_" << suffix << "), imag(cfr_" << suffix
                << "), '.', 'DisplayName', 'RX-Channel " << suffix << "');";
