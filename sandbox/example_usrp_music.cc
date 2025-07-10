@@ -41,8 +41,6 @@ void sig_int_handler(int) {
 // custom data type to pass to callback function
 struct callback_data {
     std::vector<std::complex<float>> buffer;        // Buffer to store detected symbols 
-    std::vector<float> cfo;                         // carrier frequency offsets estimated per sample 
-    std::vector<std::complex<float>> cfr;           // channel frequency response 
 };
 
 // callback function
@@ -145,8 +143,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
 
     // CFR Buffer 
     std::vector<std::vector<std::complex<float>>> cfr(NUM_CHANNELS);
-    cfr.assign(NUM_CHANNELS, std::vector<std::complex<float>>(M, std::complex<float>(0.0f, 0.0f)));
-
+    
     // Resamplers
     unsigned int num_written = 0; 
     resamp_crcf resamplers[2];
@@ -196,25 +193,21 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
                 resamp_crcf_execute(resamplers[0], buff_ptrs[0][i], &rx_sample[0], &num_written);   // Downsampling to 20MHz 
                 ms.Execute(0, &rx_sample);                                                          // Execute Synchronizer 
 
-                if (cb_data[0].buffer.size() && cb_data[0].cfr.empty()){                            // Store the CFR 
-                    ms.GetCfr(0, &cb_data[0].cfr, M);                                               // Write cfr to callback data
-                    cfr[0].assign(cb_data[0].cfr.begin(), cb_data[0].cfr.end());                    // Copy the CFR to the buffer  
-                    std::cout << "Captured CFR for channel 0!\n" << std::endl;      
-                    std::cout << "Samples channel 0: " << num_rx_samps[0] << std::endl;
-                    std::cout << "Samples channel 1: " << num_rx_samps[1] << std::endl;
+                if (cb_data[0].buffer.size() && cfr[0].empty()){                            // Store the CFR 
+                    cfr[0].assign(M, std::complex<float>(0.0f, 0.0f));                      // initialize CFR Buffer 
+                    ms.GetCfr(0, &cfr[0], M);                                               // Write cfr to callback data
+                    std::cout << "Captured CFR for channel 0!" << std::endl;      
                 };
         };
-        for (unsigned int i = 0; i < num_rx_samps[1]; ++i) {
+        for (unsigned int i = 0; i < num_rx_samps[0]; ++i) {
                 // Process Channel 1
                 resamp_crcf_execute(resamplers[1], buff_ptrs[1][i], &rx_sample[0], &num_written);   // Downsampling to 20MHz 
                 ms.Execute(1, &rx_sample);                                                          // Execute Synchronizer                 
 
-                if (cb_data[1].buffer.size() && cb_data[1].cfr.empty()){                            // Store the CFR 
-                    ms.GetCfr(1, &cb_data[1].cfr, M);                                               // Write cfr to callback data
-                    cfr[1].assign(cb_data[1].cfr.begin(), cb_data[1].cfr.end());                    // Copy the CFR to the buffer  
-                    std::cout << "Captured CFR for channel 1!\n" << std::endl;
-                    std::cout << "Samples channel 0: " << num_rx_samps[0] << std::endl;
-                    std::cout << "Samples channel 1: " << num_rx_samps[1] << std::endl;
+                if (cb_data[1].buffer.size() && cfr[1].empty()){                            // Store the CFR 
+                    cfr[1].assign(M, std::complex<float>(0.0f, 0.0f));                      // initialize CFR Buffer 
+                    ms.GetCfr(1, &cfr[1], M);                                               // Write cfr to callback data
+                    std::cout << "Captured CFR for channel 1!" << std::endl;
                                                                
                 };
             };
@@ -223,12 +216,14 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
         ms.SynchronizeNcos();
 
         // Export CFR to ZMQ socket
-        if (!cb_data[0].cfr.empty() && !cb_data[1].cfr.empty()){
+        if (!cfr[0].empty() && !cfr[1].empty()){
+            std::cout << "Exporting..." << std::endl;
             sender.send(cfr); 
-            // cfr[0].clear();  // Clear the CFR buffer for channel 0
-            // cfr[1].clear();  // Clear the CFR buffer for channel 1
+            cfr[0].clear();  // Clear the CFR buffer for channel 0
+            cfr[1].clear();  // Clear the CFR buffer for channel 1
+            cb_data[0].buffer.clear();  // Clear the buffer for channel 0
+            cb_data[1].buffer.clear();  // Clear the buffer for channel 1
             std::cout << "Exported CFRs to ZMQ!\n" << std::endl;
-            break;
         };
     };
 
