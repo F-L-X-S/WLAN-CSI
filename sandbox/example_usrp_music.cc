@@ -56,7 +56,7 @@ static int callback(std::complex<float>* _X, unsigned char * _p, unsigned int _M
             continue;
         static_cast<callback_data*>(_cb_data)->buffer.push_back(_X[i]);  
     }
-return 0;
+return 1;
 }
 
 int UHD_SAFE_MAIN(int argc, char *argv[]) {
@@ -152,7 +152,8 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     }
      
     // Receive stream confguration
-    uhd::stream_args_t stream_args("fc32", "sc16");                                         // convert internal sc16 to complex float 32
+    uhd::stream_args_t stream_args("fc32");                                                 // convert internal sc16 to complex float 32
+    stream_args.args["recv_buff_size"] = "100000000"; // 100MB Buffer
     uhd::rx_streamer::sptr rx_stream_1 = usrp_1->get_rx_stream(stream_args);                // cretae a receive stream 
     uhd::rx_streamer::sptr rx_stream_2 = usrp_2->get_rx_stream(stream_args);                // cretae a receive stream 
     size_t max_samps = rx_stream_1->get_max_num_samps();  
@@ -169,8 +170,10 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
 
     // Start receiving samples 
     uhd::rx_metadata_t md;                      // Metadata Buffer for recv
-    double seconds_in_future = 1.0;            // delay between receive cycles in seconds  
+    double seconds_in_future = 1.0;             // delay between receive cycles in seconds  
     double timeout = seconds_in_future+0.2;     //timeout (delay before receive + padding)
+    std::chrono::steady_clock::time_point last_cfr_time[NUM_CHANNELS];    // Receive timestamp 
+    unsigned int max_age = 1000;                 // Maximum age of CFR in ms before discard
 
     // Stream command
     uhd::stream_cmd_t stream_cmd(uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS);
@@ -188,27 +191,37 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
 
         // Detect Packets 
         std::vector<std::complex<float>> rx_sample(1); 
+        auto now = std::chrono::steady_clock::now();
         for (unsigned int i = 0; i < num_rx_samps[0]; ++i) {
                 // Process Channel 0
                 resamp_crcf_execute(resamplers[0], buff_ptrs[0][i], &rx_sample[0], &num_written);   // Downsampling to 20MHz 
                 ms.Execute(0, &rx_sample);                                                          // Execute Synchronizer 
-
                 if (cb_data[0].buffer.size() && cfr[0].empty()){                            // Store the CFR 
                     cfr[0].assign(M, std::complex<float>(0.0f, 0.0f));                      // initialize CFR Buffer 
                     ms.GetCfr(0, &cfr[0], M);                                               // Write cfr to callback data
+                    last_cfr_time[0] = now;                                                             // Update timestamp
                     std::cout << "Captured CFR for channel 0!" << std::endl;      
+                } else if (std::chrono::duration_cast<std::chrono::milliseconds>(now - last_cfr_time[0]).count()>max_age && !cfr[0].empty())
+                {
+                    cfr[0].clear();             // Clear the CFR buffer for channel 0
+                    cb_data[0].buffer.clear();  // Clear the buffer for channel 0
+                    std::cout << "Discarded CFR for channel 0!" << std::endl;      
                 };
         };
-        for (unsigned int i = 0; i < num_rx_samps[0]; ++i) {
+
+        for (unsigned int i = 0; i < num_rx_samps[1]; ++i) {
                 // Process Channel 1
                 resamp_crcf_execute(resamplers[1], buff_ptrs[1][i], &rx_sample[0], &num_written);   // Downsampling to 20MHz 
-                ms.Execute(1, &rx_sample);                                                          // Execute Synchronizer                 
-
+                ms.Execute(1, &rx_sample);                                                          // Execute Synchronizer      
                 if (cb_data[1].buffer.size() && cfr[1].empty()){                            // Store the CFR 
                     cfr[1].assign(M, std::complex<float>(0.0f, 0.0f));                      // initialize CFR Buffer 
-                    ms.GetCfr(1, &cfr[1], M);                                               // Write cfr to callback data
-                    std::cout << "Captured CFR for channel 1!" << std::endl;
-                                                               
+                    ms.GetCfr(1, &cfr[1], M);                                               // Write cfr to callback data            
+                    last_cfr_time[1] = now;                                                 // Update timestamp
+                    std::cout << "Captured CFR for channel 1!" << std::endl;                                           
+                } else if (std::chrono::duration_cast<std::chrono::milliseconds>(now - last_cfr_time[1]).count()>max_age && !cfr[1].empty())
+                {
+                    cfr[1].clear();             // Clear the CFR buffer for channel 1
+                    cb_data[1].buffer.clear();  // Clear the buffer for channel 1
                 };
             };
         
@@ -267,7 +280,7 @@ matlab_cmd << "figure;";
 for (unsigned int i = 0; i < NUM_CHANNELS; ++i) {
     std::string suffix = std::to_string(i);
     matlab_cmd << "plot(real(cfr_" << suffix << "), imag(cfr_" << suffix
-               << "), '.', 'DisplayName', 'RX-Channel " << suffix << "');";
+               << "), '.', 'DisplayName', 'RX-Channel " << suffix << "'); hold on;";
 }
 matlab_cmd << "title('CFR'); xlabel('Real'); ylabel('Imag'); axis equal; legend; grid on;";
 matlab_cmd << std::endl;
