@@ -55,55 +55,74 @@ return 0;
 int UHD_SAFE_MAIN(int argc, char *argv[]) {
     uhd::set_thread_priority_safe();
 
+   // Receiver settings 
+    unsigned long int ADC_RATE = 100e6;
+    double rx_rate = 25e6f;
+    // NOTE : the sample rate computation MUST be in double precision so
+    //        that the UHD can compute its decimation rate properly
+    unsigned int decim_rate = (unsigned int)(ADC_RATE / rx_rate);
+    // ensure multiple of 2
+    decim_rate = (decim_rate >> 1) << 1;
+    // compute usrp sampling rate
+    double usrp_rx_rate = ADC_RATE / (float)decim_rate;
+    // compute the resampling rate
+    double rx_resamp_rate = 0.5* rx_rate / usrp_rx_rate;
+
+
     //create a multi usrp device
-    uhd::device_addr_t dev_addr;
-    dev_addr["addr0"] = "192.168.10.3";
-    dev_addr["addr1"] = "192.168.10.4";
-    std::cout << std::endl;
-    uhd::usrp::multi_usrp::sptr usrp = uhd::usrp::multi_usrp::make(dev_addr);
+    // uhd::device_addr_t dev_addr;
+    // dev_addr["addr0"] = "192.168.10.3";
+    // dev_addr["addr1"] = "192.168.168.2";
+    // std::cout << std::endl;
+    //uhd::usrp::multi_usrp::sptr usrp = uhd::usrp::multi_usrp::make(dev_addr);
+    std::string device_args_1("addr=192.168.10.3");
+    uhd::usrp::multi_usrp::sptr usrp_1 = uhd::usrp::multi_usrp::make(device_args_1);
+    std::string device_args_2("addr=192.168.168.2");
+    uhd::usrp::multi_usrp::sptr usrp_2 = uhd::usrp::multi_usrp::make(device_args_2);
 
     // Lock mboard clocks
-    usrp->set_clock_source("internal", 0);  // internal clock source for device 0 
-    usrp->set_time_source("mimo", 1);       // mimo clock source for device 1
-    usrp->set_clock_source("mimo", 1);      // mimo clock source for device 1
-    usrp->set_time_now(uhd::time_spec_t(0.0), 0);   // set time for device 0 
-    usrp->set_time_now(uhd::time_spec_t(0.0), 1);   // set time for device 1
+    usrp_1->set_clock_source("internal", 0);  // internal clock source for device 0 
+    usrp_2->set_time_source("mimo", 0);       // mimo clock source for device 1
+    usrp_2->set_clock_source("mimo", 0);      // mimo clock source for device 1
+    usrp_1->set_time_now(uhd::time_spec_t(0.0), 0);   // set time for device 0 
+    usrp_2->set_time_now(uhd::time_spec_t(0.0), 0);   // set time for device 1
     
     //sleep a bit while the slave locks its time to the master
     boost::this_thread::sleep(boost::posix_time::milliseconds(100));
 
     //always select the subdevice first, the channel mapping affects the other settings
-    usrp->set_rx_subdev_spec(uhd::usrp::subdev_spec_t("A:0"), 0);  //set the device 0 to use the A RX frontend (RX channel 0)
-    usrp->set_rx_subdev_spec(uhd::usrp::subdev_spec_t("A:0"), 1);  //set the device 1 to use the A RX frontend (RX channel 0)
+    usrp_1->set_rx_subdev_spec(uhd::usrp::subdev_spec_t("A:0"), 0);  //set the device 0 to use the A RX frontend (RX channel 0)
+    usrp_2->set_rx_subdev_spec(uhd::usrp::subdev_spec_t("A:0"), 0);  //set the device 1 to use the A RX frontend (RX channel 0)
  
     // set sample rate
-    usrp->set_rx_rate(25e6, uhd::usrp::multi_usrp::ALL_MBOARDS);
-    std::cout << boost::format("Device 0 RX Rate: %f Msps...") % (usrp->get_rx_rate(0) / 1e6) << std::endl << std::endl;
-    std::cout << boost::format("Device 1 RX Rate: %f Msps...") % (usrp->get_rx_rate(1) / 1e6) << std::endl << std::endl;
+    usrp_1->set_rx_rate(usrp_rx_rate, uhd::usrp::multi_usrp::ALL_MBOARDS);
+    usrp_2->set_rx_rate(usrp_rx_rate, uhd::usrp::multi_usrp::ALL_MBOARDS);
+    std::cout << boost::format("Device 0 RX Rate: %f Msps...") % (usrp_1->get_rx_rate(0) / 1e6) << std::endl << std::endl;
+    std::cout << boost::format("Device 1 RX Rate: %f Msps...") % (usrp_2->get_rx_rate(0) / 1e6) << std::endl << std::endl;
 
     // set freq
     uhd::tune_request_t tune_request(2220e6, 227e6);  // create a tune request with the desired frequency and local oscillator offset
     std::cout << boost::format("Tune Policy: %f") % (tune_request.rf_freq_policy) << std::endl;
-    usrp->set_rx_freq(tune_request, 0);
-    usrp->set_rx_freq(tune_request, 1);
-    std::cout << boost::format("Device 0 RX Freq: %f MHz...") % (usrp->get_rx_freq(0) / 1e6) << std::endl << std::endl;
-    std::cout << boost::format("Device 1 RX Freq: %f MHz...") % (usrp->get_rx_freq(1) / 1e6) << std::endl << std::endl;
+    usrp_1->set_rx_freq(tune_request, 0);
+    usrp_2->set_rx_freq(tune_request, 0);
+    std::cout << boost::format("Device 0 RX Freq: %f MHz...") % (usrp_1->get_rx_freq(0) / 1e6) << std::endl << std::endl;
+    std::cout << boost::format("Device 1 RX Freq: %f MHz...") % (usrp_2->get_rx_freq(0) / 1e6) << std::endl << std::endl;
 
     // set the rf gain
-    usrp->set_rx_gain(20, 0);
-    usrp->set_rx_gain(20, 1);
-    std::cout << boost::format("Device 0 RX Gain: %f dB...") % usrp->get_rx_gain(0) << std::endl << std::endl;
-    std::cout << boost::format("Device 1 RX Gain: %f dB...") % usrp->get_rx_gain(1) << std::endl << std::endl;
+    usrp_1->set_rx_gain(20, 0);
+    usrp_2->set_rx_gain(20, 0);
+    std::cout << boost::format("Device 0 RX Gain: %f dB...") % usrp_1->get_rx_gain(0) << std::endl << std::endl;
+    std::cout << boost::format("Device 1 RX Gain: %f dB...") % usrp_2->get_rx_gain(0) << std::endl << std::endl;
 
     // set the IF filter bandwidth
-    usrp->set_rx_bandwidth(40e6, 0);
-    usrp->set_rx_bandwidth(40e6, 1);
-    std::cout << boost::format("Device 0 RX Bandwidth: %f MHz...") % (usrp->get_rx_bandwidth(0) / 1e6) << std::endl << std::endl;
-    std::cout << boost::format("Device 1 RX Bandwidth: %f MHz...") % (usrp->get_rx_bandwidth(1) / 1e6) << std::endl << std::endl;
+    // usrp->set_rx_bandwidth(40e6, 0);
+    // usrp->set_rx_bandwidth(40e6, 1);
+    std::cout << boost::format("Device 0 RX Bandwidth: %f MHz...") % (usrp_1->get_rx_bandwidth(0) / 1e6) << std::endl << std::endl;
+    std::cout << boost::format("Device 1 RX Bandwidth: %f MHz...") % (usrp_2->get_rx_bandwidth(0) / 1e6) << std::endl << std::endl;
 
     // set the antenna
-    usrp->set_rx_antenna("RX2", 0);
-    usrp->set_rx_antenna("RX2", 1);
+    usrp_1->set_rx_antenna("RX2", 0);
+    usrp_2->set_rx_antenna("RX2", 0);
 
     // callback data
     struct callback_data cb_data[NUM_FRAMES]; 
@@ -125,67 +144,56 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     std::vector<std::vector<std::complex<float>>> cfr(NUM_FRAMES);
     cfr.assign(NUM_FRAMES, std::vector<std::complex<float>>(M, std::complex<float>(0.0f, 0.0f)));
 
-    // Resampler 40MHz to 20MHz 
-    float resamp_factor = 20e6 / 40e6; // signal-bandwidth/usrp-bandwidth  
+    // Resampler 40MHz to 20MHz  
     unsigned int num_written = 0; 
     resamp_crcf resamplers[2];
     for (int i = 0; i < 2; i++) {
-        resamplers[i] = resamp_crcf_create(resamp_factor, 12, 0.45f, 60.0f, 32);
+        resamplers[i] = resamp_crcf_create(rx_resamp_rate, 12, 0.45f, 60.0f, 32);
     }
      
     // Receive stream confguration
     uhd::stream_args_t stream_args("fc32", "sc16");                                     // convert internal sc16 to complex float 32
-    stream_args.channels = {0,1};                                                       // Set the channels to receive from (0 and 1)
-    uhd::rx_streamer::sptr rx_stream = usrp->get_rx_stream(stream_args);                // cretae a receive stream 
-    size_t max_samps = rx_stream->get_max_num_samps();  
+    //stream_args.channels = {0,1};                                                       // Set the channels to receive from (0 and 1)
+    uhd::rx_streamer::sptr rx_stream_1 = usrp_1->get_rx_stream(stream_args);                // cretae a receive stream 
+    uhd::rx_streamer::sptr rx_stream_2 = usrp_2->get_rx_stream(stream_args);                // cretae a receive stream 
+    size_t max_samps = rx_stream_1->get_max_num_samps();  
 
     // Allocate RX Stream buffer  
     std::vector<std::vector<std::complex<float> > > buffs(
-        usrp->get_rx_num_channels(), std::vector<std::complex<float> >(max_samps)
+        // usrp->get_rx_num_channels(), std::vector<std::complex<float> >(max_samps)
+        3, std::vector<std::complex<float> >(max_samps)
     );
     std::vector<std::complex<float> *> buff_ptrs;   //vector of pointers to point to each of the channel buffers
     for (size_t i = 0; i < buffs.size(); i++) buff_ptrs.push_back(&buffs[i].front());
 
-    // Stream command
-    uhd::stream_cmd_t stream_cmd(uhd::stream_cmd_t::STREAM_MODE_NUM_SAMPS_AND_DONE);
-    stream_cmd.num_samps = max_samps;                                                   // number of samples to receive per frame
-    stream_cmd.stream_now = false;   
+    // ZMQ socket for data export 
+    ZmqSender sender("tcp://*:5555");
 
     // Start receiving samples 
     uhd::rx_metadata_t md;                      // Metadata Buffer for recv()
     unsigned int num_frames = 0;                // received frames counter  
-    double seconds_in_future = 0.05;            // delay between receive cycles in seconds  
-    double timeout = seconds_in_future+0.02;     //timeout (delay before receive + padding)
+    double seconds_in_future = 1.0;            // delay between receive cycles in seconds  
+    double timeout = seconds_in_future+0.2;     //timeout (delay before receive + padding)
 
-    // ZMQ socket for data export 
-    ZmqSender sender("tcp://*:5555");
+    // Stream command
+    uhd::stream_cmd_t stream_cmd(uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS);
+    stream_cmd.num_samps = max_samps;                                                   // number of samples to receive per frame
+    stream_cmd.stream_now = true;  
+    stream_cmd.time_spec = usrp_1->get_time_now() + uhd::time_spec_t(seconds_in_future);  // set the time spec to start receiving in the future
+    usrp_1->issue_stream_cmd(stream_cmd); 
+    usrp_2->issue_stream_cmd(stream_cmd); 
 
     while (num_frames<NUM_FRAMES) {
-        // Issue stream command to start receiving
-        stream_cmd.time_spec = usrp->get_time_now() + uhd::time_spec_t(seconds_in_future);  // set the time spec to start receiving in the future
-        usrp->issue_stream_cmd(stream_cmd);
-
         //receive a single packet from USRPs
-        size_t num_rx_samps = rx_stream->recv(
-            buff_ptrs, max_samps, md, timeout
-        );
-
-        std::cout << boost::format("Received %d samples...") % num_rx_samps << std::endl;
-
-        //handle the error code
-        if (md.error_code == uhd::rx_metadata_t::ERROR_CODE_TIMEOUT) {
-            std::cout << "Timeout while receiving samples..." << std::endl;
-            break;
-        }
-        if (md.error_code != uhd::rx_metadata_t::ERROR_CODE_NONE){
-            throw std::runtime_error(str(boost::format(
-                "Receiver error %s"
-            ) % md.strerror()));
-        }
+        // size_t num_rx_samps = rx_stream_1->recv(
+        //     buff_ptrs, max_samps, md, timeout
+        // );
+        size_t num_rx_samps_1 = rx_stream_1->recv(&buffs[0].front(), buffs[0].size(), md);
+        size_t num_rx_samps_2 = rx_stream_2->recv(&buffs[1].front(), buffs[1].size(), md);
 
         // Detect Packets 
         std::vector<std::complex<float>> rx_sample(1); 
-        for (unsigned int i = 0; i < num_rx_samps; ++i) {
+        for (unsigned int i = 0; i < num_rx_samps_1; ++i) {
                 // Process Channel 0
                 resamp_crcf_execute(resamplers[0], buff_ptrs[0][i], &rx_sample[0], &num_written);   // Downsampling to 20MHz 
                 ms.Execute(0, &rx_sample);                                                          // Execute Synchronizer 
@@ -195,7 +203,8 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
                     cfr[0].assign(cb_data[0].cfr.begin(), cb_data[0].cfr.end());                    // Copy the CFR to the buffer  
                     std::cout << "Captured CFR for channel 0!\n" << std::endl;                                        
                 };
-
+        };
+        for (unsigned int i = 0; i < num_rx_samps_1; ++i) {
                 // Process Channel 1
                 resamp_crcf_execute(resamplers[1], buff_ptrs[1][i], &rx_sample[0], &num_written);   // Downsampling to 20MHz 
                 ms.Execute(1, &rx_sample);                                                          // Execute Synchronizer                 
@@ -206,25 +215,26 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
                     std::cout << "Captured CFR for channel 1!\n" << std::endl;
                                                                
                 };
+            };
+        
+        // Synchronize NCOs of all channels to the average NCO frequency and phase
+        ms.SynchronizeNcos();
 
-                // Synchronize NCOs of all channels to the average NCO frequency and phase
-                ms.SynchronizeNcos();
+        // Export CFR to ZMQ socket
+        if (!cb_data[0].cfr.empty() && !cb_data[1].cfr.empty()){
+            sender.send(cfr); 
+            cfr[0].clear();  // Clear the CFR buffer for channel 0
+            cfr[1].clear();  // Clear the CFR buffer for channel 1
+            std::cout << "Exported CFRs to ZMQ!\n" << std::endl;
+            num_frames++;
+        }
 
-                // Export CFR to ZMQ socket
-                if (!cb_data[0].cfr.empty() && !cb_data[1].cfr.empty()){
-                    sender.send(cfr); 
-                    cfr[0].clear();  // Clear the CFR buffer for channel 0
-                    cfr[1].clear();  // Clear the CFR buffer for channel 1
-                    std::cout << "Exported CFRs to ZMQ!\n" << std::endl;
-                    num_frames++;
-                }
-
-                // Stop receiving if we have enough frames
-                if (num_frames >= NUM_FRAMES) break;
+        // Stop receiving if we have enough frames
+        if (num_frames >= NUM_FRAMES) break;
         };
-    };
 
-    usrp->issue_stream_cmd(uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS);
+    usrp_1->issue_stream_cmd(uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS);
+    usrp_2->issue_stream_cmd(uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS);
     std::cout << "Stopped receiving...\n" << std::endl;
 
 // ----------------- MATLAB output ----------------------
