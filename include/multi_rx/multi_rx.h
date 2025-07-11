@@ -142,12 +142,13 @@ void export_worker(CfrQueue_t& cfr_queue,
     std::vector<Cfr_t> cfr_buffer;         
 
     // Sorted and time-matched CFRs of all channels
-    std::array<Cfr_t, num_channels> cfr;
+    std::array<std::vector<std::complex<float>>, num_channels> cfr;
 
     unsigned int i;
     while (!stop_signal_called.load()) {
         // Clear samples
         cfr_buffer.clear();
+        cfr.clear();
 
         // Move cfr queue to buffer
         std::lock_guard<std::mutex> lock_cfr(cfr_queue.mtx);
@@ -158,30 +159,24 @@ void export_worker(CfrQueue_t& cfr_queue,
             cfr_queue.queue.pop();
         }
 
-        // Remove expired CFRs from buffer
-        cfr_buffer.erase(
-            std::remove_if(cfr_buffer.begin(), cfr_buffer.end(),
-                [&](const Cfr_t& cfr) {
-                    return (std::chrono::duration_cast<std::chrono::milliseconds>(now - cfr.timestamp).count() > max_age);
-                }),
-            cfr_buffer.end()
-        );
+        // Sort CFRs by timestamp
+        std::sort(cfr_buffer.begin(), cfr_buffer.end(),
+            [](const Cfr_t& a, const Cfr_t& b) {
+                return a.timestamp < b.timestamp;
+            });
 
-        // Process channels
-        for (i = 0; i < num_channels; ++i) {
-            // Export CFR to ZMQ socket
-            if (!cfr[0].empty() && !cfr[1].empty()){
-                std::cout << "Exporting..." << std::endl;
-                sender.send(cfr); 
-                cfr[0].clear();  // Clear the CFR buffer for channel 0
-                cfr[1].clear();  // Clear the CFR buffer for channel 1
-                cb_data[0].buffer.clear();  // Clear the buffer for channel 0
-                cb_data[1].buffer.clear();  // Clear the buffer for channel 1
-                std::cout << "Exported CFRs to ZMQ!\n" << std::endl;
-            };
+        // Find matching CFR groups within max_age
+        for (i = 0; i < cfr_buffer.size(); ++i) {
+            
+        }
+
+        // Export CFR to ZMQ socket
+        if (!cfr.empty()) {
+            sender.send(cfr); 
+            std::cout << "Exported CFRs to ZMQ!\n" << std::endl;
+        };
                 
         }
-    }
 }
 
 #endif // MULTIRX_H
