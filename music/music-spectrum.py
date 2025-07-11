@@ -23,15 +23,19 @@ import PyQt6.QtQml
 import zmq
 import struct
 
-ANTENNAS_PER_ROW = 10
+ANTENNAS_PER_ROW = 2
 
 class MusicSpectrum(PyQt6.QtWidgets.QApplication):
 	def pollSocket(self):
-		socks = dict(self.poller.poll(timeout=0))
+		msg = None
+		# Drain the socket: keep only the latest message
+		while True:
+			try:
+				msg = self.socket.recv(zmq.NOBLOCK)
+			except zmq.Again:
+				break  # No more messages available
 
-		if self.socket in socks:
-			msg = self.socket.recv()
-			
+		if msg is not None:			
 			# Header: 3 x uint32 → 12 bytes
 			n_measurements, num_channels, samples_per_channel = struct.unpack("III", msg[:12])
 
@@ -67,7 +71,7 @@ class MusicSpectrum(PyQt6.QtWidgets.QApplication):
 		self.poller = zmq.Poller()
 		self.poller.register(self.socket, zmq.POLLIN)
 		self.csi = None
-		self.antennas_per_row = 10
+		self.antennas_per_row = ANTENNAS_PER_ROW
 
 		# Initialize MUSIC scanning angles, steering vectors
    		# steering vectors are the phases of the received Signal as function of angle theta 
