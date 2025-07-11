@@ -27,19 +27,20 @@
 
 #include <matlab_export/matlab_export.h>
 #include <multisync/multisync.h>
+#include <multi_rx/multi_rx.h>
 #include <zmq_socket/zmq_socket.h>
 
 #define NUM_CHANNELS 2                              // Number of Channels (USRP-devices)   
 #define OUTFILE "./matlab/example_usrp_music.m"     // Output file in MATLAB-format to store results
 #define EXPORT_INTERFACE 'tcp://localhost:5555'     // Interface for zmq socket
 
+using Sync_t = MultiSync<ofdmframesync>;
+
 // Signal handler to stop by keaboard interrupt
 std::atomic<bool> stop_signal_called(false);
-
 void sig_int_handler(int) {
     stop_signal_called.store(true);
 }
-
 
 // custom data type to pass to callback function
 struct callback_data {
@@ -60,137 +61,6 @@ static int callback(std::complex<float>* _X, unsigned char * _p, unsigned int _M
         static_cast<callback_data*>(_cb_data)->buffer.push_back(_X[i]);  
     }
 return 1;
-}
-
-// Thread-safe queues for received samples
-std::queue<std::vector<std::complex<float>>> rx_queue_0;
-std::queue<std::vector<std::complex<float>>> rx_queue_1;
-std::mutex mtx_0, mtx_1;
-std::condition_variable cv_0, cv_1;
-std::atomic<bool> finished{false};
-
-void rx_worker(uhd::rx_streamer::sptr rx_stream,
-               std::queue<std::vector<std::complex<float>>>& queue,
-               std::mutex& mtx,
-               std::condition_variable& cv,
-               const std::string& name) {
-    uhd::rx_metadata_t md;
-    std::vector<std::complex<float>> buff(8192);
-
-    while (!finished.load()) {
-        size_t n_rx = rx_stream->recv(&buff.front(), buff.size(), md, 1.0);
-        std::vector<std::complex<float>> samples(buff.begin(), buff.begin() + n_rx);
-        {
-            std::lock_guard<std::mutex> lock(mtx);
-            queue.push(std::move(samples));
-        }
-        cv.notify_one();
-    }
-}
-
-void main_processor(std::array<resamp_crcf, 2>& resamplers, ZmqSender& sender) {
-
-    // callback data
-    struct callback_data cb_data[NUM_CHANNELS]; 
-    void* userdata[NUM_CHANNELS];
-
-    // Array of Pointers to CB-Data 
-    for (unsigned int i = 0; i < NUM_CHANNELS; ++i)
-        userdata[i] = &cb_data[i];
-        
-    // Create multi frame synchronizer
-    unsigned int M           = 64;      // number of subcarriers 
-    unsigned int cp_len      = 16;      // cyclic prefix length (800ns for 20MHz => 16 Sample)
-    unsigned int taper_len   = 4;       // window taper length 
-    unsigned char p[M];                 // subcarrier allocation array
-    ofdmframe_init_default_sctype(M, p);
-    MultiSync<ofdmframesync> ms(NUM_CHANNELS, {M, cp_len, taper_len, p}, callback, userdata);
-
-    // CFR Buffer 
-    std::vector<std::vector<std::complex<float>>> cfr(NUM_CHANNELS);
-
-    while (!finished.load()) {
-        std::vector<std::complex<float>> samples_0, samples_1;
-
-        // Process queue 0
-        {
-            std::unique_lock<std::mutex> lock(mtx_0);
-            cv_0.wait(lock, [] { return !rx_queue_0.empty() || finished.load(); });
-
-            if (!rx_queue_0.empty()) {
-                samples_0 = std::move(rx_queue_0.front());
-                rx_queue_0.pop();
-            }
-        }
-
-        // Process queue 1
-        {
-            std::unique_lock<std::mutex> lock(mtx_1);
-            cv_1.wait(lock, [] { return !rx_queue_1.empty() || finished.load(); });
-
-            if (!rx_queue_1.empty()) {
-                samples_1 = std::move(rx_queue_1.front());
-                rx_queue_1.pop();
-            }
-        }
-
-        // Detect Packets 
-        std::vector<std::complex<float>> rx_sample(1); 
-        unsigned int num_written = 0; 
-        auto now = std::chrono::steady_clock::now();
-        std::array<std::chrono::steady_clock::time_point, NUM_CHANNELS> last_cfr_time = {now, now};
-        unsigned int max_age = 1000;                                            // Maximum age of CFR in ms before discard
-
-        for (unsigned int i = 0; i < samples_0.size(); ++i) {
-                // Process Channel 0
-                resamp_crcf_execute(resamplers[0], samples_0[i], &rx_sample[0], &num_written);   // Downsampling to 20MHz 
-                ms.Execute(0, &rx_sample);                                                          // Execute Synchronizer 
-                if (cb_data[0].buffer.size() && cfr[0].empty()){                            // Store the CFR 
-                    cfr[0].assign(M, std::complex<float>(0.0f, 0.0f));                      // initialize CFR Buffer 
-                    ms.GetCfr(0, &cfr[0], M);                                               // Write cfr to callback data
-                    last_cfr_time[0] = now;                                                 // Update timestamp
-                    std::cout << "Captured CFR for channel 0!" << std::endl;      
-                    break;
-                } else if (std::chrono::duration_cast<std::chrono::milliseconds>(now - last_cfr_time[0]).count()>max_age && !cfr[0].empty())
-                {
-                    cfr[0].clear();             // Clear the CFR buffer for channel 0
-                    cb_data[0].buffer.clear();  // Clear the buffer for channel 0
-                    std::cout << "Discarded CFR for channel 0!" << std::endl;      
-                };
-        };
-        now = std::chrono::steady_clock::now();
-        for (unsigned int i = 0; i < samples_1.size(); ++i) {
-                // Process Channel 1
-                resamp_crcf_execute(resamplers[1], samples_1[i], &rx_sample[0], &num_written);   // Downsampling to 20MHz 
-                ms.Execute(1, &rx_sample);                                                          // Execute Synchronizer      
-                if (cb_data[1].buffer.size() && cfr[1].empty()){                            // Store the CFR 
-                    cfr[1].assign(M, std::complex<float>(0.0f, 0.0f));                      // initialize CFR Buffer 
-                    ms.GetCfr(1, &cfr[1], M);                                               // Write cfr to callback data            
-                    last_cfr_time[1] = now;                                                 // Update timestamp
-                    std::cout << "Captured CFR for channel 1!" << std::endl;    
-                    break;                                       
-                } else if (std::chrono::duration_cast<std::chrono::milliseconds>(now - last_cfr_time[1]).count()>max_age && !cfr[1].empty())
-                {
-                    cfr[1].clear();             // Clear the CFR buffer for channel 1
-                    cb_data[1].buffer.clear();  // Clear the buffer for channel 1
-                    std::cout << "Discarded CFR for channel 1!" << std::endl;   
-                };
-            };
-        
-        // Synchronize NCOs of all channels to the average NCO frequency and phase
-        ms.SynchronizeNcos();
-
-        // Export CFR to ZMQ socket
-        if (!cfr[0].empty() && !cfr[1].empty()){
-            std::cout << "Exporting..." << std::endl;
-            sender.send(cfr); 
-            cfr[0].clear();  // Clear the CFR buffer for channel 0
-            cfr[1].clear();  // Clear the CFR buffer for channel 1
-            cb_data[0].buffer.clear();  // Clear the buffer for channel 0
-            cb_data[1].buffer.clear();  // Clear the buffer for channel 1
-            std::cout << "Exported CFRs to ZMQ!\n" << std::endl;
-        };
-    }
 }
 
 // Main function 
@@ -260,12 +130,6 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     usrp_0->set_rx_antenna("RX2", 0);
     usrp_1->set_rx_antenna("RX2", 0);
     
-    // Resamplers
-    std::array<resamp_crcf, 2> resamplers = {
-        resamp_crcf_create(rx_resamp_rate, 12, 0.45f, 60.0f, 32),
-        resamp_crcf_create(rx_resamp_rate, 12, 0.45f, 60.0f, 32)
-    };
-     
     // Receive stream confguration
     uhd::stream_args_t stream_args("fc32");                                                 // convert internal sc16 to complex float 32
     stream_args.args["recv_buff_size"] = "100000000"; // 100MB Buffer
@@ -273,46 +137,76 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     uhd::rx_streamer::sptr rx_stream_1 = usrp_1->get_rx_stream(stream_args);                // cretae a receive stream 
     size_t max_samps = rx_stream_0->get_max_num_samps();  
 
+    // Resamplers
+    std::array<resamp_crcf, 2> resamplers = {
+        resamp_crcf_create(rx_resamp_rate, 12, 0.45f, 60.0f, 32),
+        resamp_crcf_create(rx_resamp_rate, 12, 0.45f, 60.0f, 32)
+    };
+     
+    // Thread-safe queues 
+    std::array<RxSamplesQueue_t, 2> rx_queues;
+    CfrQueue_t cfr_queue;
+
+    // callback data
+    std::array<callback_data, NUM_CHANNELS> cb_data;
+    void* userdata[NUM_CHANNELS];
+
+    // Array of Pointers to CB-Data 
+    for (unsigned int i = 0; i < NUM_CHANNELS; ++i)
+        userdata[i] = &cb_data[i];
+        
+    // Create multi frame synchronizer
+    unsigned int M           = 64;      // number of subcarriers 
+    unsigned int cp_len      = 16;      // cyclic prefix length (800ns for 20MHz => 16 Sample)
+    unsigned int taper_len   = 4;       // window taper length 
+    unsigned char p[M];                 // subcarrier allocation array
+    ofdmframe_init_default_sctype(M, p);
+    Sync_t ms(NUM_CHANNELS, {M, cp_len, taper_len, p}, callback, userdata);
+
     // ZMQ socket for data export 
     ZmqSender sender("tcp://*:5555");
 
-    // Start receiving samples 
-    uhd::rx_metadata_t md;                      // Metadata Buffer for recv
-    double seconds_in_future = 1.0;             // delay between receive cycles in seconds  
-    double timeout = seconds_in_future+0.2;     //timeout (delay before receive + padding)
-
-    // Stream command
+    // Configure stream command
     uhd::stream_cmd_t stream_cmd(uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS);
     stream_cmd.num_samps = max_samps;                                                   // number of samples to receive per frame
-    stream_cmd.stream_now = true;  
-    //stream_cmd.time_spec = usrp_0->get_time_now() + uhd::time_spec_t(seconds_in_future);  // set the time spec to start receiving in the future
+    stream_cmd.stream_now = false;  
+    double seconds_in_future = 1.0;            
+    stream_cmd.time_spec = usrp_0->get_time_now() + uhd::time_spec_t(seconds_in_future);  // set the time spec to start receiving in the future
+
+    // Start USRPs streaming
     usrp_0->issue_stream_cmd(stream_cmd); 
     usrp_1->issue_stream_cmd(stream_cmd); 
 
-    std::thread t0(rx_worker, rx_stream_0, std::ref(rx_queue_0), std::ref(mtx_0), std::ref(cv_0), "RX0");
-    std::thread t1(rx_worker, rx_stream_1, std::ref(rx_queue_1), std::ref(mtx_1), std::ref(cv_1), "RX1");
-    std::thread main_thread(main_processor,  std::ref(resamplers), std::ref(sender));
+    // Start receiving...
+    std::thread t0(rx_worker<4096>, rx_stream_0, std::ref(rx_queues[0]), std::ref(stop_signal_called));
+    std::thread t1(rx_worker<4096>, rx_stream_1, std::ref(rx_queues[1]), std::ref(stop_signal_called));
+    std::thread t2(sync_worker<NUM_CHANNELS, Sync_t, callback_data>, 
+        std::ref(resamplers), std::ref(ms), 
+        std::ref(cb_data), std::ref(rx_queues),
+        std::ref(cfr_queue), std::ref(stop_signal_called));
+    std::thread t3(export_worker<NUM_CHANNELS>, std::ref(cfr_queue), 1000, std::ref(sender), std::ref(stop_signal_called));
 
     // Let it run for a while...
     std::this_thread::sleep_for(std::chrono::seconds(500));
 
     // Signal stop
-    finished = true;
-    cv_0.notify_all();
-    cv_1.notify_all();
+    usrp_0->issue_stream_cmd(uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS);
+    usrp_1->issue_stream_cmd(uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS);
+
+    rx_queues[0].cv.notify_all();
+    rx_queues[0].cv.notify_all();
+    cfr_queue.cv.notify_all();
 
     t0.join();
     t1.join();
-    main_thread.join();
+    t2.join();
+    t3.join();
 
-    usrp_0->issue_stream_cmd(uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS);
-    usrp_1->issue_stream_cmd(uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS);
-    std::cout << "Stopped receiving...\n" << std::endl;
-
-    // Destroy objects
     for (auto& r : resamplers) {
     resamp_crcf_destroy(r);
-}
+    }
+
+    std::cout << "Stopped receiving...\n" << std::endl;
 
 // ----------------- MATLAB output ----------------------
 // MatlabExport m_file(OUTFILE);

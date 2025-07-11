@@ -30,9 +30,9 @@
 using RxSample_t = std::complex<float>;   // Received samples type
 struct RxSamplesQueue_t
 {
-    std::queue<std::vector<RxSample_t>>& queue,
-    std::mutex& mtx,
-    std::condition_variable& cv
+    std::queue<std::vector<RxSample_t>> queue;
+    std::mutex mtx;
+    std::condition_variable cv;
 };
 
 struct Cfr_t {
@@ -42,20 +42,21 @@ struct Cfr_t {
 };
 struct CfrQueue_t
 {
-    std::queue<Cfr_t>& queue,
-    std::mutex& mtx,
-    std::condition_variable& cv
+    std::queue<Cfr_t> queue;
+    std::mutex mtx;
+    std::condition_variable cv;
 };
 
 
 // RX-Worker receives samples from the USRP and pushes them into a thread-safe queue
 template <std::size_t buffer_size>
 void rx_worker( uhd::rx_streamer::sptr rx_stream,
-                RxSamplesQueue_t& q) {
+                RxSamplesQueue_t& q,
+                std::atomic<bool>& stop_signal_called) {
     uhd::rx_metadata_t md;
     std::vector<RxSample_t> buff(buffer_size);
 
-    while (!finished.load()) {
+    while (!stop_signal_called.load()) {
         size_t n_rx = rx_stream->recv(&buff.front(), buff.size(), md, 1.0);
         std::vector<RxSample_t> samples(buff.begin(), buff.begin() + n_rx);
         {
@@ -67,12 +68,13 @@ void rx_worker( uhd::rx_streamer::sptr rx_stream,
 }
 
 // Sync-Worker processes queued samples from RX-workers and pushes the resulting CFRs into a thread-safe queue
-template <std::size_t num_channels, type_t syncronizer_type, type_t cb_data_type>
+template <std::size_t num_channels, typename syncronizer_type, typename cb_data_type>
 void sync_worker(   std::array<resamp_crcf, num_channels>& resamplers,
                     syncronizer_type& ms,
                     std::array<cb_data_type, num_channels>& cb_data,
                     std::array<RxSamplesQueue_t, num_channels>& rx_queues,
                     CfrQueue_t& cfr_queue,
+                    std::atomic<bool>& stop_signal_called
                 ) {
 
     auto now = std::chrono::steady_clock::now();
@@ -93,7 +95,9 @@ void sync_worker(   std::array<resamp_crcf, num_channels>& resamplers,
 
                 // Process channel queue 
                 std::unique_lock<std::mutex> lock_rx(rx_queues[i].mtx);
-                rx_queues[i].cv.wait(lock_rx, [] { return !rx_queues[i].queue.empty() || stop_signal_called.load(); });
+                rx_queues[i].cv.wait(lock_rx, [&rx_queues, i, &stop_signal_called] { 
+                    return !rx_queues[i].queue.empty() || stop_signal_called.load(); 
+                });
 
                 if (!rx_queues[i].queue.empty()) {
                     samples[i] = std::move(rx_queues[i].queue.front());
@@ -110,8 +114,8 @@ void sync_worker(   std::array<resamp_crcf, num_channels>& resamplers,
                     
                     // Check, if callback-data was updated by synchronizer
                     if (cb_data[i].buffer.size()){                         
-                        cfr.cfr.assign(M, std::complex<float>(0.0f, 0.0f));                     // initialize CFR Buffer 
-                        ms.GetCfr(0, &cfr.cfr, M);                                              // Write cfr to callback data
+                        cfr.cfr.assign(64, std::complex<float>(0.0f, 0.0f));                    // initialize CFR Buffer for 64 FFT points
+                        ms.GetCfr(0, &cfr.cfr, 64);                                             // Write cfr to callback data
                         cfr.timestamp = now;                                                    // Update timestamp
                         cfr.channel = i;                                                        // Set channel index
 
@@ -134,9 +138,10 @@ void sync_worker(   std::array<resamp_crcf, num_channels>& resamplers,
 
 // Export-Worker processes queued CFRs from Sync-workers and either discards them or exports them to a ZMQ socket
 template <std::size_t num_channels>
-void export_worker(CfrQueue_t& cfr_queue, 
+void export_worker( CfrQueue_t& cfr_queue, 
                     unsigned int max_age,
-                    ZmqSender& sender) {
+                    ZmqSender& sender,
+                    std::atomic<bool>& stop_signal_called) {
 
     // Queued CFRs of all channels and all times 
     std::vector<Cfr_t> cfr_buffer;         
@@ -150,8 +155,10 @@ void export_worker(CfrQueue_t& cfr_queue,
         cfr_buffer.clear();
 
         // Move cfr queue to buffer
-        std::lock_guard<std::mutex> lock_cfr(cfr_queue.mtx);
-        cfr_queue.cv.wait(lock_cfr, [] { return !cfr_queue.queue.empty() || stop_signal_called.load(); });
+        std::unique_lock<std::mutex> lock_cfr(cfr_queue.mtx);
+        cfr_queue.cv.wait(lock_cfr, [&cfr_queue, &stop_signal_called] { 
+            return !cfr_queue.queue.empty() || stop_signal_called.load(); 
+        });
 
         if (!cfr_queue.queue.empty()) {
             cfr_buffer.push_back(std::move(cfr_queue.queue.front()));
@@ -173,7 +180,7 @@ void export_worker(CfrQueue_t& cfr_queue,
             // Find all CFRs around base within the max_age window
             for (size_t j = i + 1; j < cfr_buffer.size(); ++j) {
                 // Next timestamp out of range
-                if (cfr_buffer[j].timestamp - base.timestamp > max_age)
+                if (std::chrono::duration_cast<std::chrono::milliseconds>(cfr_buffer[j].timestamp - base.timestamp).count() > max_age)
                     break;
                 // Found CFR for another channel
                 if (!group[cfr_buffer[j].channel])
