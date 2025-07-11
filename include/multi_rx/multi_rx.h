@@ -142,13 +142,12 @@ void export_worker(CfrQueue_t& cfr_queue,
     std::vector<Cfr_t> cfr_buffer;         
 
     // Sorted and time-matched CFRs of all channels
-    std::array<std::vector<std::complex<float>>, num_channels> cfr;
+    std::vector<std::vector<std::complex<float>>> cfr_group(num_channels);
 
     unsigned int i;
     while (!stop_signal_called.load()) {
         // Clear samples
         cfr_buffer.clear();
-        cfr.clear();
 
         // Move cfr queue to buffer
         std::lock_guard<std::mutex> lock_cfr(cfr_queue.mtx);
@@ -165,18 +164,45 @@ void export_worker(CfrQueue_t& cfr_queue,
                 return a.timestamp < b.timestamp;
             });
 
-        // Find matching CFR groups within max_age
-        for (i = 0; i < cfr_buffer.size(); ++i) {
-            
-        }
+        // Iterate over CFRs
+        for (size_t i = 0; i < cfr_buffer.size(); ++i) {
+            std::vector<const Cfr_t*> group(num_channels, nullptr);
+            const auto& base = cfr_buffer[i];
+            group[base.channel] = &base;
 
-        // Export CFR to ZMQ socket
-        if (!cfr.empty()) {
-            sender.send(cfr); 
-            std::cout << "Exported CFRs to ZMQ!\n" << std::endl;
-        };
-                
+            // Find all CFRs around base within the max_age window
+            for (size_t j = i + 1; j < cfr_buffer.size(); ++j) {
+                // Next timestamp out of range
+                if (cfr_buffer[j].timestamp - base.timestamp > max_age)
+                    break;
+                // Found CFR for another channel
+                if (!group[cfr_buffer[j].channel])
+                    group[cfr_buffer[j].channel] = &cfr_buffer[j];
+            }
+
+            // Check if group is complete
+            bool complete = true;
+            for (auto ptr : group) {
+                if (!ptr) { complete = false; break; }
+            }
+
+            // Export if a complete group was found
+            if (complete) {
+                // Clear the CFR group
+                cfr_group.clear();    
+                // Prepare CFRs sorted by channel
+                for (size_t ch = 0; ch < num_channels; ++ch)
+                    cfr_group[ch] = group[ch]->cfr;
+
+                // Export to ZMQ socket
+                sender.send(cfr_group);
+                std::cout << "Exported CFR!\n"<< std::endl;
+
+                // Break queue processing 
+                break;
+            }
         }
+    }
 }
 
 #endif // MULTIRX_H
