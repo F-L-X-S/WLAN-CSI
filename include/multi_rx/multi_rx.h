@@ -90,8 +90,9 @@ void sync_worker(   std::array<resamp_crcf, num_channels>& resamplers,
 
         // Process channels
         for (i = 0; i < num_channels; ++i) {
-                // Clear samples
+                // Clear samples and Callback-data
                 samples[i].clear();
+                cb_data[i].buffer.clear();  
 
                 // Process channel queue 
                 std::unique_lock<std::mutex> lock_rx(rx_queues[i].mtx);
