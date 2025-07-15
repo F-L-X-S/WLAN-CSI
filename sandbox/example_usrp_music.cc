@@ -78,15 +78,14 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     decim_rate = (decim_rate >> 1) << 1;
     // compute usrp sampling rate
     double usrp_rx_rate = ADC_RATE / (float)decim_rate;
-    // compute the resampling rate
-    double rx_resamp_rate = 0.5* rx_rate / usrp_rx_rate;
-
+    // compute the resampling rate (20MHz to 40 MHz = 0.5)
+    float rx_resamp_rate = 0.5*rx_rate / usrp_rx_rate;
 
     //create USRP devices
-    std::string device_args_1("addr=192.168.10.3");
-    uhd::usrp::multi_usrp::sptr usrp_0 = uhd::usrp::multi_usrp::make(device_args_1);
-    std::string device_args_2("addr=192.168.168.2");
-    uhd::usrp::multi_usrp::sptr usrp_1 = uhd::usrp::multi_usrp::make(device_args_2);
+    std::string device_args_0("addr=192.168.10.3");
+    std::string device_args_1("addr=192.168.168.2");
+    uhd::usrp::multi_usrp::sptr usrp_0 = uhd::usrp::multi_usrp::make(device_args_0);
+    uhd::usrp::multi_usrp::sptr usrp_1 = uhd::usrp::multi_usrp::make(device_args_1);
 
     // Lock mboard clocks
     usrp_0->set_clock_source("internal", 0);  // internal clock source for device 0 
@@ -94,6 +93,9 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     usrp_1->set_clock_source("mimo", 0);      // mimo clock source for device 1
     usrp_0->set_time_now(uhd::time_spec_t(0.0), 0);   // set time for device 0 
     usrp_1->set_time_now(uhd::time_spec_t(0.0), 0);   // set time for device 1
+
+    std::cout << boost::format("Device 1 Clock-src: %s") % usrp_1->get_clock_source(0) << std::endl << std::endl;
+    std::cout << boost::format("Device 1 Time-src: %s") % usrp_1->get_time_source(0) << std::endl << std::endl;
     
     //sleep a bit while the slave locks its time to the master
     boost::this_thread::sleep(boost::posix_time::milliseconds(100));
@@ -105,25 +107,27 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     // set sample rate
     usrp_0->set_rx_rate(usrp_rx_rate, uhd::usrp::multi_usrp::ALL_MBOARDS);
     usrp_1->set_rx_rate(usrp_rx_rate, uhd::usrp::multi_usrp::ALL_MBOARDS);
-    std::cout << boost::format("Device 0 RX Rate: %f Msps...") % (usrp_0->get_rx_rate(0) / 1e6) << std::endl << std::endl;
-    std::cout << boost::format("Device 1 RX Rate: %f Msps...") % (usrp_1->get_rx_rate(0) / 1e6) << std::endl << std::endl;
+    std::cout << boost::format("Required USRP RX Rate: %f Msps...") % (usrp_rx_rate / 1e6) << std::endl;
+    std::cout << boost::format("Device 0 RX Rate: %f Msps...") % (usrp_0->get_rx_rate(0) / 1e6) << std::endl;
+    std::cout << boost::format("Device 1 RX Rate: %f Msps...") % (usrp_1->get_rx_rate(0) / 1e6) << std::endl;
+    std::cout << boost::format("Resampling-Rate: %f Msps...") % (rx_resamp_rate) << std::endl;
 
     // set freq
     uhd::tune_request_t tune_request(2220e6, 227e6);  // create a tune request with the desired frequency and local oscillator offset
     std::cout << boost::format("Tune Policy: %f") % (tune_request.rf_freq_policy) << std::endl;
     usrp_0->set_rx_freq(tune_request, 0);
     usrp_1->set_rx_freq(tune_request, 0);
-    std::cout << boost::format("Device 0 RX Freq: %f MHz...") % (usrp_0->get_rx_freq(0) / 1e6) << std::endl << std::endl;
-    std::cout << boost::format("Device 1 RX Freq: %f MHz...") % (usrp_1->get_rx_freq(0) / 1e6) << std::endl << std::endl;
+    std::cout << boost::format("Device 0 RX Freq: %f MHz...") % (usrp_0->get_rx_freq(0) / 1e6) << std::endl;
+    std::cout << boost::format("Device 1 RX Freq: %f MHz...") % (usrp_1->get_rx_freq(0) / 1e6) << std::endl;
 
     // set the rf gain
-    usrp_0->set_rx_gain(20, 0);
-    usrp_1->set_rx_gain(20, 0);
-    std::cout << boost::format("Device 0 RX Gain: %f dB...") % usrp_0->get_rx_gain(0) << std::endl << std::endl;
-    std::cout << boost::format("Device 1 RX Gain: %f dB...") % usrp_1->get_rx_gain(0) << std::endl << std::endl;
+    usrp_0->set_rx_gain(30, 0);
+    usrp_1->set_rx_gain(30, 0);
+    std::cout << boost::format("Device 0 RX Gain: %f dB...") % usrp_0->get_rx_gain(0) << std::endl;
+    std::cout << boost::format("Device 1 RX Gain: %f dB...") % usrp_1->get_rx_gain(0) << std::endl;
 
     // Print Bandwidth 
-    std::cout << boost::format("Device 0 RX Bandwidth: %f MHz...") % (usrp_0->get_rx_bandwidth(0) / 1e6) << std::endl << std::endl;
+    std::cout << boost::format("Device 0 RX Bandwidth: %f MHz...") % (usrp_0->get_rx_bandwidth(0) / 1e6) << std::endl;
     std::cout << boost::format("Device 1 RX Bandwidth: %f MHz...") % (usrp_1->get_rx_bandwidth(0) / 1e6) << std::endl << std::endl;
 
     // set the antenna
@@ -166,6 +170,9 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     // ZMQ socket for data export 
     ZmqSender sender("tcp://*:5555");
 
+    // Matlab Export destination file
+    MatlabExport m_file(OUTFILE);
+
     // Configure stream command
     uhd::stream_cmd_t stream_cmd(uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS);
     stream_cmd.num_samps = max_samps;                                                   // number of samples to receive per frame
@@ -184,7 +191,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
         std::ref(resamplers), std::ref(ms), 
         std::ref(cb_data), std::ref(rx_queues),
         std::ref(cfr_queue), std::ref(stop_signal_called));
-    std::thread t3(export_worker<NUM_CHANNELS>, std::ref(cfr_queue), 1000, std::ref(sender), std::ref(stop_signal_called));
+    std::thread t3(export_worker<NUM_CHANNELS>, std::ref(cfr_queue), 1000, std::ref(sender), std::ref(m_file), std::ref(stop_signal_called));
 
     // Let it run for a while...
     std::this_thread::sleep_for(std::chrono::seconds(500));
@@ -194,7 +201,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     usrp_1->issue_stream_cmd(uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS);
 
     rx_queues[0].cv.notify_all();
-    rx_queues[0].cv.notify_all();
+    rx_queues[1].cv.notify_all();
     cfr_queue.cv.notify_all();
 
     t0.join();
@@ -208,49 +215,5 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
 
     std::cout << "Stopped receiving...\n" << std::endl;
 
-// ----------------- MATLAB output ----------------------
-// MatlabExport m_file(OUTFILE);
-
-// // Export CFRs to MATLAB file
-// for (unsigned int i = 0; i < NUM_CHANNELS; ++i) {
-//     std::string suffix = std::to_string(i);
-//     m_file.Add(cfr[i], "cfr_" + suffix);
-// }
-
-// // Add combined plot-commands to the MATLAB file
-// std::stringstream matlab_cmd;
-
-// matlab_cmd << "figure;";
-// // CFR Magnitude
-// matlab_cmd << "subplot(2,1,1); hold on;";
-// for (unsigned int i = 0; i < NUM_CHANNELS; ++i) {
-//     std::string suffix = std::to_string(i);
-//     matlab_cmd << "plot(abs(cfr_" << suffix << "), 'DisplayName', 'RX-Channel " << suffix << "');";
-// }
-// matlab_cmd << "title('Channel Frequency Response Gain'); legend; grid on;";
-// matlab_cmd << std::endl;
-
-// // CFR Phase
-// matlab_cmd << "subplot(2,1,2); hold on;";
-// for (unsigned int i = 0; i < NUM_CHANNELS; ++i) {
-//     std::string suffix = std::to_string(i);
-//     matlab_cmd << "plot(angle(cfr_" << suffix << "), 'DisplayName', 'RX-Channel " << suffix << "');";
-// }
-// matlab_cmd << "title('Channel Frequency Response Phase'); legend; grid on;";
-// matlab_cmd << std::endl;
-
-// // CFR in Complex 
-// matlab_cmd << "figure;";
-// for (unsigned int i = 0; i < NUM_CHANNELS; ++i) {
-//     std::string suffix = std::to_string(i);
-//     matlab_cmd << "plot(real(cfr_" << suffix << "), imag(cfr_" << suffix
-//                << "), '.', 'DisplayName', 'RX-Channel " << suffix << "'); hold on;";
-// }
-// matlab_cmd << "title('CFR'); xlabel('Real'); ylabel('Imag'); axis equal; legend; grid on;";
-// matlab_cmd << std::endl;
-
-// // Add the complete command string to MATLAB export
-// m_file.Add(matlab_cmd.str());
-
-//     return EXIT_SUCCESS;
+return EXIT_SUCCESS;
 }

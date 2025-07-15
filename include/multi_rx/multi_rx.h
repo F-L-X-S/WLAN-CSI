@@ -25,6 +25,7 @@
 
 #include <multisync/multisync.h>
 #include <zmq_socket/zmq_socket.h>
+#include <matlab_export/matlab_export.h>
 
 // Typedefs
 using RxSample_t = std::complex<float>;   // Received samples type
@@ -108,7 +109,7 @@ void sync_worker(   std::array<resamp_crcf, num_channels>& resamplers,
                 // Detect Packets 
                 for (j = 0; j < samples[i].size(); ++j) {
                     // Resample to original carrier frequency
-                    resamp_crcf_execute(resamplers[0], samples[i][j], &rx_sample[0], &num_written);  
+                    resamp_crcf_execute(resamplers[i], samples[i][j], &rx_sample[0], &num_written);  
                     
                     // Execute Synchronizer for channel i 
                     ms.Execute(i, &rx_sample);          
@@ -116,7 +117,7 @@ void sync_worker(   std::array<resamp_crcf, num_channels>& resamplers,
                     // Check, if callback-data was updated by synchronizer
                     if (cb_data[i].buffer.size()){                         
                         cfr.cfr.assign(64, std::complex<float>(0.0f, 0.0f));                    // initialize CFR Buffer for 64 FFT points
-                        ms.GetCfr(0, &cfr.cfr, 64);                                             // Write cfr to callback data
+                        ms.GetCfr(i, &cfr.cfr, 64);                                             // Write cfr to callback data
                         cfr.timestamp = now;                                                    // Update timestamp
                         cfr.channel = i;                                                        // Set channel index
 
@@ -126,7 +127,7 @@ void sync_worker(   std::array<resamp_crcf, num_channels>& resamplers,
                             cfr_queue.queue.push(std::move(cfr));
                         }
                         cfr_queue.cv.notify_one();
-                        std::cout << "Captured CFR for channel "<< i <<"!" << std::endl;      
+                        std::cout << "Captured CFR for channel "<< i <<"!" << std::endl;
                         break;
                     };
                 };
@@ -142,6 +143,7 @@ template <std::size_t num_channels>
 void export_worker( CfrQueue_t& cfr_queue, 
                     unsigned int max_age,
                     ZmqSender& sender,
+                    MatlabExport& m_file,
                     std::atomic<bool>& stop_signal_called) {
 
     // Queued CFRs of all channels and all times 
@@ -200,9 +202,55 @@ void export_worker( CfrQueue_t& cfr_queue,
                 for (size_t ch = 0; ch < num_channels; ++ch)
                     cfr_group[ch] = group[ch]->cfr;
 
-                // Export to ZMQ socket
+                //----------------- ZMQ Export ----------------------
                 sender.send(cfr_group);
                 std::cout << "Exported CFR!\n"<< std::endl;
+
+                // Clear the buffer up to the current index
+                cfr_buffer.erase(cfr_buffer.begin(), cfr_buffer.end());
+
+
+                //----------------- MATLAB Export ----------------------
+                // Export CFRs to MATLAB file
+                for (unsigned int i = 0; i < num_channels; ++i) {
+                    std::string suffix = std::to_string(i);
+                    m_file.Add(cfr_group[i], "cfr_" + suffix);
+                }
+
+                // Add combined plot-commands to the MATLAB file
+                std::stringstream matlab_cmd;
+
+                matlab_cmd << "figure;";
+                // CFR Magnitude
+                matlab_cmd << "subplot(2,1,1); hold on;";
+                for (unsigned int i = 0; i < num_channels; ++i) {
+                    std::string suffix = std::to_string(i);
+                    matlab_cmd << "plot(abs(cfr_" << suffix << "), 'DisplayName', 'RX-Channel " << suffix << "');";
+                }
+                matlab_cmd << "title('Channel Frequency Response Gain'); legend; grid on;";
+                matlab_cmd << std::endl;
+
+                // CFR Phase
+                matlab_cmd << "subplot(2,1,2); hold on;";
+                for (unsigned int i = 0; i < num_channels; ++i) {
+                    std::string suffix = std::to_string(i);
+                    matlab_cmd << "plot(angle(cfr_" << suffix << "), 'DisplayName', 'RX-Channel " << suffix << "');";
+                }
+                matlab_cmd << "title('Channel Frequency Response Phase'); legend; grid on;";
+                matlab_cmd << std::endl;
+
+                // CFR in Complex 
+                matlab_cmd << "figure;";
+                for (unsigned int i = 0; i < num_channels; ++i) {
+                    std::string suffix = std::to_string(i);
+                    matlab_cmd << "plot(real(cfr_" << suffix << "), imag(cfr_" << suffix
+                            << "), '.', 'DisplayName', 'RX-Channel " << suffix << "'); hold on;";
+                }
+                matlab_cmd << "title('CFR'); xlabel('Real'); ylabel('Imag'); axis equal; legend; grid on;";
+                matlab_cmd << std::endl;
+
+                // Add the complete command string to MATLAB export
+                m_file.Add(matlab_cmd.str());
 
                 // Break queue processing 
                 break;
@@ -215,6 +263,7 @@ void export_worker( CfrQueue_t& cfr_queue,
             cfr_buffer.erase(cfr_buffer.begin(), cfr_buffer.end() - (rest>static_cast<int>(num_channels) ? rest : static_cast<int>(num_channels)));
         };
     }
+
 }
 
 #endif // MULTIRX_H
