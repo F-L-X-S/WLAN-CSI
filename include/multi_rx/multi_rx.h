@@ -152,9 +152,6 @@ void export_worker( CfrQueue_t& cfr_queue,
 
     unsigned int i;
     while (!stop_signal_called.load()) {
-        // Clear samples
-        cfr_buffer.clear();
-
         // Move cfr queue to buffer
         std::unique_lock<std::mutex> lock_cfr(cfr_queue.mtx);
         cfr_queue.cv.wait(lock_cfr, [&cfr_queue, &stop_signal_called] { 
@@ -173,7 +170,8 @@ void export_worker( CfrQueue_t& cfr_queue,
             });
 
         // Find a group of CFRs from all channels within the max_age window
-        for (size_t i = 0; i < cfr_buffer.size(); ++i) {
+        unsigned int i;
+        for (i = 0; i < cfr_buffer.size(); ++i) {
             std::vector<const Cfr_t*> group(num_channels, nullptr); // Group of CFRs from each channel
             const auto& base = cfr_buffer[i];                       // Add initial CFR to group
             group[base.channel] = &base;
@@ -196,8 +194,8 @@ void export_worker( CfrQueue_t& cfr_queue,
 
             // Export if a complete group was found
             if (complete) {
-                // Clear the CFR group
-                cfr_group.clear();    
+                // Reset the CFR group
+                cfr_group = std::vector<std::vector<std::complex<float>>>(num_channels);
                 // Prepare CFRs sorted by channel
                 for (size_t ch = 0; ch < num_channels; ++ch)
                     cfr_group[ch] = group[ch]->cfr;
@@ -210,6 +208,12 @@ void export_worker( CfrQueue_t& cfr_queue,
                 break;
             }
         }
+
+        // Clear all processed CFRs from the buffer, keep min. one CFR for each channel
+        if (cfr_buffer.size() > num_channels){
+            int rest = static_cast<int>(cfr_buffer.size()) - static_cast<int>(i) - 1;
+            cfr_buffer.erase(cfr_buffer.begin(), cfr_buffer.end() - (rest>static_cast<int>(num_channels) ? rest : static_cast<int>(num_channels)));
+        };
     }
 }
 
