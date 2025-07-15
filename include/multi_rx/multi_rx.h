@@ -172,23 +172,23 @@ void export_worker( CfrQueue_t& cfr_queue,
                 return a.timestamp < b.timestamp;
             });
 
-        // Iterate over CFRs
+        // Find a group of CFRs from all channels within the max_age window
         for (size_t i = 0; i < cfr_buffer.size(); ++i) {
-            std::vector<const Cfr_t*> group(num_channels, nullptr);
-            const auto& base = cfr_buffer[i];
+            std::vector<const Cfr_t*> group(num_channels, nullptr); // Group of CFRs from each channel
+            const auto& base = cfr_buffer[i];                       // Add initial CFR to group
             group[base.channel] = &base;
 
             // Find all CFRs around base within the max_age window
             for (size_t j = i + 1; j < cfr_buffer.size(); ++j) {
-                // Next timestamp out of range
+                // Next timestamp out of range -> no group existing for this base-CFR
                 if (std::chrono::duration_cast<std::chrono::milliseconds>(cfr_buffer[j].timestamp - base.timestamp).count() > max_age)
                     break;
-                // Found CFR for another channel
+                // Found CFR for another channel within the max_age window
                 if (!group[cfr_buffer[j].channel])
                     group[cfr_buffer[j].channel] = &cfr_buffer[j];
             }
 
-            // Check if group is complete
+            // Check if group is complete (all channels have a CFR)
             bool complete = true;
             for (auto ptr : group) {
                 if (!ptr) { complete = false; break; }
