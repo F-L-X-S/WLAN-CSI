@@ -103,6 +103,7 @@ set(SANDBOX_SRC_FILES
   sandbox/example_ofdm_multisync.cc
   sandbox/example_music.cc
   sandbox/example_usrp.cc
+  sandbox/example_usrp_music.cc
 )
 
 # Iterate over each file in SOURCE_FILES
