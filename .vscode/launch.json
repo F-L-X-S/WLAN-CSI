@@ -20,7 +20,7 @@
               "value": "Something something"
           }
       ],
-      "externalConsole": false,
+      "externalConsole": true,
       "MIMode": "lldb",
     },
     {
