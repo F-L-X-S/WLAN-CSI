@@ -82,7 +82,7 @@ class MusicSpectrum(PyQt6.QtWidgets.QApplication):
 		# Poll CSI from socket
 		self.timer = PyQt6.QtCore.QTimer()
 		self.timer.timeout.connect(self.pollSocket)
-		self.timer.start(100) # 100ms
+		self.timer.start(50) # 100ms
 
 
 	def exec(self):
