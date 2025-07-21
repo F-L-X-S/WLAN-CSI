@@ -32,8 +32,8 @@ using RxSample_t = std::complex<float>;   // Received samples type
 
 struct RxSampleBlock_t
 {
-    std::vector<RxSample_t> samples;
-    uhd::time_spec_t timestamp;
+    std::vector<RxSample_t> samples;                    // Received samples
+    uhd::time_spec_t timestamp;                         // Timestamp of the sample block
 };
 
 struct RxSamplesQueue_t
@@ -48,9 +48,23 @@ struct Cfr_t {
     uhd::time_spec_t  timestamp;                        // Timestamp of the CFR
     unsigned int channel;                               // Channel index
 };
+
 struct CfrQueue_t
 {
     std::queue<Cfr_t> queue;
+    std::mutex mtx;
+    std::condition_variable cv;
+};
+
+struct CallbackData_t {
+    std::vector<std::complex<float>> buffer;            // Buffer to store detected symbols 
+    uhd::time_spec_t  timestamp;                        // Timestamp 
+    unsigned int channel;                               // Channel index
+};
+
+struct CbDataQueue_t
+{
+    std::queue<CallbackData_t> queue;
     std::mutex mtx;
     std::condition_variable cv;
 };
@@ -81,9 +95,10 @@ void rx_worker( uhd::rx_streamer::sptr rx_stream,
 template <std::size_t num_channels, typename syncronizer_type, typename cb_data_type>
 void sync_worker(   std::array<resamp_crcf, num_channels>& resamplers,
                     syncronizer_type& ms,
-                    std::array<cb_data_type, num_channels>& cb_data,
+                    std::array<CallbackData_t, num_channels>& cb_data,
                     std::array<RxSamplesQueue_t, num_channels>& rx_queues,
                     CfrQueue_t& cfr_queue,
+                    CbDataQueue_t& cbdata_queue,
                     std::atomic<bool>& stop_signal_called
                 ) {
 
@@ -123,17 +138,27 @@ void sync_worker(   std::array<resamp_crcf, num_channels>& resamplers,
                             ms.Execute(i, &rx_sample);          
                                 
                             // Check, if callback-data was updated by synchronizer
-                            if (cb_data[i].buffer.size()){                         
+                            if (cb_data[i].buffer.size()){     
+                                // Push CFR to queue                    
                                 ms.GetCfr(i, &cfr.cfr);                                                 // Write cfr to callback data
                                 cfr.timestamp = sample_blocks[j].timestamp;                             // Update timestamp
                                 cfr.channel = i;                                                        // Set channel index
-
-                                // Push CFR to queue
                                 {
                                     std::lock_guard<std::mutex> lock_cfr(cfr_queue.mtx);
                                     cfr_queue.queue.push(std::move(cfr));
                                 }
                                 cfr_queue.cv.notify_one();
+
+                                // Push Callback-data to queue
+                                cb_data[i].timestamp = sample_blocks[j].timestamp;                      // Update timestamp
+                                cb_data[i].channel = i;                                                 // Set channel index
+                                {
+                                    std::lock_guard<std::mutex> lock_cb(cbdata_queue.mtx);
+                                    cbdata_queue.queue.push(std::move(cb_data[i]));
+                                }
+                                cbdata_queue.cv.notify_one();
+
+                                // Print debug info 
                                 std::cout << "Captured CFR for channel "<< i <<" at timestamp "<< cfr.timestamp.get_full_secs() << std::endl;
                                 break;
                             };
@@ -149,7 +174,7 @@ void sync_worker(   std::array<resamp_crcf, num_channels>& resamplers,
 
 // Export-Worker processes queued CFRs from Sync-workers and either discards them or exports them to a ZMQ socket
 template <std::size_t num_channels>
-void export_worker( CfrQueue_t& cfr_queue, 
+void cfr_export_worker( CfrQueue_t& cfr_queue, 
                     uhd::time_spec_t max_age,
                     ZmqSender& sender,
                     MatlabExport& m_file,
@@ -278,5 +303,57 @@ void export_worker( CfrQueue_t& cfr_queue,
     }
 
 }
+
+// Export-Worker processes queued CB-Data from a Sync-worker and exports them to a MATLAB file
+void cbdata_export_worker(  CbDataQueue_t& cbdata_queue, 
+                            MatlabExport& m_file,
+                            std::atomic<bool>& stop_signal_called) {
+
+    // Queued cb-data 
+    std::vector<CallbackData_t> cbdata_buffer; 
+    std::vector<std::string> cbdata_varnames;       
+
+    unsigned int i;
+    while (!stop_signal_called.load()) {
+        // Move CB-Data queue to buffer
+        std::unique_lock<std::mutex> lock_cb(cbdata_queue.mtx);
+        cbdata_queue.cv.wait(lock_cb, [&cbdata_queue, &stop_signal_called] { 
+            return !cbdata_queue.queue.empty() || stop_signal_called.load(); 
+        });
+
+        if (stop_signal_called.load()) break;
+
+        if (!cbdata_queue.queue.empty()) {
+            cbdata_buffer.push_back(std::move(cbdata_queue.queue.front()));
+            cbdata_queue.queue.pop();
+        }
+
+        // Export CB-Data buffer to MATLAB file
+        for (unsigned int i = 0; i < cbdata_buffer.size(); ++i) {
+            std::string suffix = "CH" + std::to_string(cbdata_buffer[i].channel)+"_"+ std::to_string(cbdata_buffer[i].timestamp.get_tick_count(1000));
+            m_file.Add(cbdata_buffer[i].buffer, suffix);
+            cbdata_varnames.push_back(suffix);
+        }
+
+        // Clear the buffer
+        cbdata_buffer.clear();
+    }
+
+    // Add combined plot-command to the MATLAB file
+    std::stringstream matlab_cmd;
+
+    // CFR in Complex 
+    matlab_cmd << "figure;";
+    for (auto& varname : cbdata_varnames    ) {
+        matlab_cmd << "plot(real("<< varname <<"), imag("<< varname
+                <<"), '.', 'DisplayName', '"<< varname <<"'); hold on;";
+    }
+    matlab_cmd << "title('Received Data'); xlabel('Real'); ylabel('Imag'); axis equal; legend; grid on;";
+    matlab_cmd << std::endl;
+
+    // Add the complete command string to MATLAB export
+    m_file.Add(matlab_cmd.str());
+}
+
 
 #endif // MULTIRX_H

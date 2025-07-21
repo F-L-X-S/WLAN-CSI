@@ -30,22 +30,19 @@
 #include <multi_rx/multi_rx.h>
 #include <zmq_socket/zmq_socket.h>
 
-#define NUM_CHANNELS 2                              // Number of Channels (USRP-devices)   
-#define OUTFILE "./matlab/example_usrp_music.m"     // Output file in MATLAB-format to store results
-#define EXPORT_INTERFACE 'tcp://localhost:5555'     // Interface for zmq socket
+#define NUM_CHANNELS 2                                          // Number of Channels (USRP-devices)   
+#define OUTFILE_CFR "./matlab/example_usrp_music/cfr.m"         // Output file in MATLAB-format to store results
+#define OUTFILE_CBDATA "./matlab/example_usrp_music/cbdata.m"   // Output file in MATLAB-format to store results
+#define EXPORT_INTERFACE 'tcp://localhost:5555'                 // Interface for zmq socket
 
+// Use OFDM-frame synchronizer for multi-channel synchronization
 using Sync_t = MultiSync<ofdmframesync>;
 
 // Signal handler to stop by keaboard interrupt
 std::atomic<bool> stop_signal_called(false);
 void sig_int_handler(int) {
-    stop_signal_called.store(true);
+    stop_signal_called=true;
 }
-
-// custom data type to pass to callback function
-struct callback_data {
-    std::vector<std::complex<float>> buffer;        // Buffer to store detected symbols 
-};
 
 // callback function
 //  _X          : array of received subcarrier samples [size: _M x 1]
@@ -58,7 +55,7 @@ static int callback(std::complex<float>* _X, unsigned char * _p, unsigned int _M
         // ignore 'null' and 'pilot' subcarriers
         if (_p[i] != OFDMFRAME_SCTYPE_DATA)
             continue;
-        static_cast<callback_data*>(_cb_data)->buffer.push_back(_X[i]);  
+        static_cast<CallbackData_t*>(_cb_data)->buffer.push_back(_X[i]);  
     }
 return 1;
 }
@@ -67,6 +64,13 @@ return 1;
 int UHD_SAFE_MAIN(int argc, char *argv[]) {
     uhd::set_thread_priority_safe();
     std::signal(SIGINT, &sig_int_handler);
+
+    // ZMQ socket for data export 
+    ZmqSender sender("tcp://*:5555");
+
+    // Matlab Export destination file
+    MatlabExport m_file_cfr(OUTFILE_CFR);
+    MatlabExport m_file_cbdata(OUTFILE_CBDATA);
 
    // Receiver settings 
     unsigned long int ADC_RATE = 100e6;
@@ -150,9 +154,10 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     // Thread-safe queues 
     std::array<RxSamplesQueue_t, 2> rx_queues;
     CfrQueue_t cfr_queue;
+    CbDataQueue_t cbdata_queue;
 
     // callback data
-    std::array<callback_data, NUM_CHANNELS> cb_data;
+    std::array<CallbackData_t, NUM_CHANNELS> cb_data;
     void* userdata[NUM_CHANNELS];
 
     // Array of Pointers to CB-Data 
@@ -166,12 +171,6 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     unsigned char p[M];                 // subcarrier allocation array
     ofdmframe_init_default_sctype(M, p);
     Sync_t ms(NUM_CHANNELS, {M, cp_len, taper_len, p}, callback, userdata);
-
-    // ZMQ socket for data export 
-    ZmqSender sender("tcp://*:5555");
-
-    // Matlab Export destination file
-    MatlabExport m_file(OUTFILE);
 
     // Configure stream command
     uhd::stream_cmd_t stream_cmd(uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS);
@@ -187,14 +186,15 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     // Start receiving...
     std::thread t0(rx_worker<4096>, rx_stream_0, std::ref(rx_queues[0]), std::ref(stop_signal_called));
     std::thread t1(rx_worker<4096>, rx_stream_1, std::ref(rx_queues[1]), std::ref(stop_signal_called));
-    std::thread t2(sync_worker<NUM_CHANNELS, Sync_t, callback_data>, 
+    std::thread t2(sync_worker<NUM_CHANNELS, Sync_t, CallbackData_t>, 
         std::ref(resamplers), std::ref(ms), 
-        std::ref(cb_data), std::ref(rx_queues),
-        std::ref(cfr_queue), std::ref(stop_signal_called));
-    std::thread t3(export_worker<NUM_CHANNELS>, std::ref(cfr_queue), double(1), std::ref(sender), std::ref(m_file), std::ref(stop_signal_called));
+        std::ref(cb_data), std::ref(rx_queues), 
+        std::ref(cfr_queue), std::ref(cbdata_queue),std::ref(stop_signal_called));
+    std::thread t3(cfr_export_worker<NUM_CHANNELS>, std::ref(cfr_queue), double(1), std::ref(sender), std::ref(m_file_cfr), std::ref(stop_signal_called));
+    std::thread t4(cbdata_export_worker, std::ref(cbdata_queue), std::ref(m_file_cbdata), std::ref(stop_signal_called));
 
-    // Let it run for a while...
-    std::this_thread::sleep_for(std::chrono::seconds(500));
+    std::this_thread::sleep_for(std::chrono::milliseconds(20000));
+    stop_signal_called.store(true);
 
     // Signal stop
     usrp_0->issue_stream_cmd(uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS);
@@ -203,11 +203,13 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     rx_queues[0].cv.notify_all();
     rx_queues[1].cv.notify_all();
     cfr_queue.cv.notify_all();
+    cbdata_queue.cv.notify_all();
 
     t0.join();
     t1.join();
     t2.join();
     t3.join();
+    t4.join();
 
     for (auto& r : resamplers) {
     resamp_crcf_destroy(r);
