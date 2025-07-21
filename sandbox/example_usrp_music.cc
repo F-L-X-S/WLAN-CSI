@@ -59,7 +59,6 @@ static int callback(std::complex<float>* _X, unsigned char * _p, unsigned int _M
         if (_p[i] != OFDMFRAME_SCTYPE_DATA)
             continue;
         static_cast<callback_data*>(_cb_data)->buffer.push_back(_X[i]);  
-        std::cout << boost::format("Callback!");
     }
 return 0;
 }

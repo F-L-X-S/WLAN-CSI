@@ -135,7 +135,7 @@ void sync_worker(   std::array<resamp_crcf, num_channels>& resamplers,
                                     cfr_queue.queue.push(std::move(cfr));
                                 }
                                 cfr_queue.cv.notify_one();
-                                std::cout << "Captured CFR for channel "<< i <<"!" << std::endl;
+                                std::cout << "Captured CFR for channel "<< i <<" at timestamp "<< cfr.timestamp.get_full_secs() << std::endl;
                                 break;
                             };
                         };
@@ -214,7 +214,11 @@ void export_worker( CfrQueue_t& cfr_queue,
 
                 //----------------- ZMQ Export ----------------------
                 sender.send(cfr_group);
-                std::cout << "Exported CFR!\n"<< std::endl;
+                std::cout << "Exported CFR at timestamps ";
+                for (const auto& cfr : group) {
+                    std::cout << cfr[0].timestamp.get_full_secs() << " ";
+                }
+                std::cout <<"!"<< std::endl;
 
                 // Clear the buffer up to the current index
                 cfr_buffer.erase(cfr_buffer.begin(), cfr_buffer.end());
