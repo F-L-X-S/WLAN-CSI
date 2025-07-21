@@ -70,7 +70,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
 
    // Receiver settings 
     unsigned long int ADC_RATE = 100e6;
-    double rx_rate = 25e6f;
+    double rx_rate = 20e6f;
     // NOTE : the sample rate computation MUST be in double precision so
     //        that the UHD can compute its decimation rate properly
     unsigned int decim_rate = (unsigned int)(ADC_RATE / rx_rate);
@@ -78,8 +78,8 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     decim_rate = (decim_rate >> 1) << 1;
     // compute usrp sampling rate
     double usrp_rx_rate = ADC_RATE / (float)decim_rate;
-    // compute the resampling rate (20MHz to 40 MHz = 0.5)
-    float rx_resamp_rate = 0.5*rx_rate / usrp_rx_rate;
+    // compute the resampling rate
+    float rx_resamp_rate = rx_rate / usrp_rx_rate;
 
     //create USRP devices
     std::string device_args_0("addr=192.168.10.3");
@@ -143,8 +143,8 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
 
     // Resamplers
     std::array<resamp_crcf, 2> resamplers = {
-        resamp_crcf_create(rx_resamp_rate, 12, 0.45f, 60.0f, 32),
-        resamp_crcf_create(rx_resamp_rate, 12, 0.45f, 60.0f, 32)
+        resamp_crcf_create_default(rx_resamp_rate),
+        resamp_crcf_create_default(rx_resamp_rate)
     };
      
     // Thread-safe queues 
