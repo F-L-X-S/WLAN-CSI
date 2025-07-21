@@ -66,8 +66,10 @@ struct SyncTraits<ofdmframesync> {
         ofdmframesync_destroy(fs);
     }
 
-    static void GetCfr(ofdmframesync_s* fs, std::vector<std::complex<float>>* X, unsigned int fft_size) 
+    static void GetCfr(ofdmframesync_s* fs, std::vector<std::complex<float>>* X) 
     {
+        unsigned int fft_size = ofdmframesync_get_fft_size(fs);
+        X->resize(fft_size);
         ofdmframesync_get_cfr(fs, X->data(), fft_size);
     }
 
@@ -208,11 +210,9 @@ MultiSync(  unsigned int             num_channels,
      * @param n Arraysize 
      */
     void GetCfr(unsigned int                         channel_id, 
-                std::vector<std::complex<float>>*    X,
-                unsigned int                         fft_size)
+                std::vector<std::complex<float>>*    X)
                 {
-                     X->resize(fft_size);
-                    SyncTraits<synchronizer_type>::GetCfr(framesync_[channel_id], X, fft_size);
+                    SyncTraits<synchronizer_type>::GetCfr(framesync_[channel_id], X);
                 };
 
 

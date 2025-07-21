@@ -124,8 +124,7 @@ void sync_worker(   std::array<resamp_crcf, num_channels>& resamplers,
                                 
                             // Check, if callback-data was updated by synchronizer
                             if (cb_data[i].buffer.size()){                         
-                                cfr.cfr.assign(64, std::complex<float>(0.0f, 0.0f));                    // initialize CFR Buffer for 64 FFT points
-                                ms.GetCfr(i, &cfr.cfr, 64);                                             // Write cfr to callback data
+                                ms.GetCfr(i, &cfr.cfr);                                                 // Write cfr to callback data
                                 cfr.timestamp = sample_blocks[j].timestamp;                             // Update timestamp
                                 cfr.channel = i;                                                        // Set channel index
 
