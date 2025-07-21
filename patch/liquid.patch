@@ -16,7 +16,7 @@ index fad0497f..8e72cb34 100644
  option(BUILD_SANDBOX    "Set to ON to build sandbox programs"   OFF)
  option(BUILD_DOC        "Set to ON to build documentation"      OFF)
 diff --git a/include/liquid.h b/include/liquid.h
-index 3db82f8b..8efaecee 100644
+index 3db82f8b..acf740d9 100644
 --- a/include/liquid.h
 +++ b/include/liquid.h
 @@ -8965,132 +8965,6 @@ LIQUID_FIRPFBCHR_DEFINE_API(LIQUID_FIRPFBCHR_MANGLE_CRCF,
@@ -152,7 +152,7 @@ index 3db82f8b..8efaecee 100644
  //
  // MODULE : nco (numerically-controlled oscillator)
  //
-@@ -9347,6 +9221,138 @@ void SYNTH(_despread_triple)(SYNTH() _q,                                    \
+@@ -9347,6 +9221,139 @@ void SYNTH(_despread_triple)(SYNTH() _q,                                    \
  // Define synth APIs
  LIQUID_SYNTH_DEFINE_API(SYNTH_MANGLE_FLOAT, float, liquid_float_complex)
  
@@ -275,9 +275,10 @@ index 3db82f8b..8efaecee 100644
 +// query methods
 +float ofdmframesync_get_rssi(ofdmframesync _q);     // received signal strength indication
 +float ofdmframesync_get_cfo(ofdmframesync _q);      // carrier offset estimate
-+void ofdmframesync_get_cfr(ofdmframesync _q, 
++void ofdmframesync_get_cfr(ofdmframesync _q,        // channel frequency response
 +                            liquid_float_complex * _x,
 +                            unsigned int _n); 
++unsigned int ofdmframesync_get_fft_size(ofdmframesync _q);  // size of fft
 +nco_crcf* ofdmframesync_get_nco(ofdmframesync _q);  // get nco object
 +
 +// set methods
@@ -292,10 +293,26 @@ index 3db82f8b..8efaecee 100644
  
  //
 diff --git a/src/multichannel/src/ofdmframesync.c b/src/multichannel/src/ofdmframesync.c
-index d15eeadc..e48ead1d 100644
+index d15eeadc..acdd776f 100644
 --- a/src/multichannel/src/ofdmframesync.c
 +++ b/src/multichannel/src/ofdmframesync.c
-@@ -448,6 +448,21 @@ float ofdmframesync_get_rssi(ofdmframesync _q)
+@@ -240,6 +240,7 @@ ofdmframesync ofdmframesync_create(unsigned int           _M,
+     q->g0 = 1.0f;
+     q->G0a = (float complex*) malloc((q->M)*sizeof(float complex));
+     q->G0b = (float complex*) malloc((q->M)*sizeof(float complex));
++    q->G1 = (float complex*) malloc((q->M)*sizeof(float complex));
+     q->G   = (float complex*) malloc((q->M)*sizeof(float complex));
+     q->B   = (float complex*) malloc((q->M)*sizeof(float complex));
+     q->R   = (float complex*) malloc((q->M)*sizeof(float complex));
+@@ -247,6 +248,7 @@ ofdmframesync ofdmframesync_create(unsigned int           _M,
+ #if 1
+     memset(q->G0a, 0x00, q->M*sizeof(float complex));
+     memset(q->G0b, 0x00, q->M*sizeof(float complex));
++    memset(q->G1 ,  0x00, q->M*sizeof(float complex));
+     memset(q->G ,  0x00, q->M*sizeof(float complex));
+     memset(q->B,   0x00, q->M*sizeof(float complex));
+ #endif
+@@ -448,6 +450,27 @@ float ofdmframesync_get_rssi(ofdmframesync _q)
      return -10.0f*log10(_q->g0);
  }
  
@@ -305,7 +322,13 @@ index d15eeadc..e48ead1d 100644
 +                            unsigned int _n)
 +{
 + for (unsigned int i=0; i<_n; i++)
-+        _x[i] = _q->G[i];
++        _x[i] = _q->G1[i];
++};
++
++// get size of fft 
++unsigned int ofdmframesync_get_fft_size(ofdmframesync _q)
++{
++    return _q->M;
 +};
 +
 +// Get NCO Object
@@ -317,3 +340,13 @@ index d15eeadc..e48ead1d 100644
  // get receiver carrier frequency offset estimate
  float ofdmframesync_get_cfo(ofdmframesync _q)
  {
+@@ -687,6 +710,9 @@ int ofdmframesync_execute_S1(ofdmframesync _q)
+     // TODO : add backoff in gain estimation
+     ofdmframesync_estimate_gain_S1(_q, &rc[_q->cp_len], _q->G);
+ 
++    // Store gain estimate
++    memcpy(_q->G1, _q->G, _q->M * sizeof(float));
++
+     // compute detector output
+     float complex g_hat = 0.0f;
+     unsigned int i;
