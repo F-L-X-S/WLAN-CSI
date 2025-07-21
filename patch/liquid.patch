@@ -293,7 +293,7 @@ index 3db82f8b..acf740d9 100644
  
  //
 diff --git a/src/multichannel/src/ofdmframesync.c b/src/multichannel/src/ofdmframesync.c
-index d15eeadc..acdd776f 100644
+index d15eeadc..8b956c2d 100644
 --- a/src/multichannel/src/ofdmframesync.c
 +++ b/src/multichannel/src/ofdmframesync.c
 @@ -240,6 +240,7 @@ ofdmframesync ofdmframesync_create(unsigned int           _M,
@@ -340,13 +340,13 @@ index d15eeadc..acdd776f 100644
  // get receiver carrier frequency offset estimate
  float ofdmframesync_get_cfo(ofdmframesync _q)
  {
-@@ -687,6 +710,9 @@ int ofdmframesync_execute_S1(ofdmframesync _q)
-     // TODO : add backoff in gain estimation
-     ofdmframesync_estimate_gain_S1(_q, &rc[_q->cp_len], _q->G);
+@@ -751,6 +774,9 @@ int ofdmframesync_execute_S1(ofdmframesync _q)
+         ofdmframesync_reset(_q);
+     }
  
 +    // Store gain estimate
-+    memcpy(_q->G1, _q->G, _q->M * sizeof(float));
++    memcpy(_q->G1, _q->G, _q->M * sizeof(float complex));
 +
-     // compute detector output
-     float complex g_hat = 0.0f;
-     unsigned int i;
+     // 'reset' timer (wait another half symbol)
+     _q->timer = _q->M2;
+     return LIQUID_OK;
