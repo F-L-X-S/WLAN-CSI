@@ -60,7 +60,7 @@ static int callback(std::complex<float>* _X, unsigned char * _p, unsigned int _M
             continue;
         static_cast<callback_data*>(_cb_data)->buffer.push_back(_X[i]);  
     }
-return 0;
+return 1;
 }
 
 // Main function 
