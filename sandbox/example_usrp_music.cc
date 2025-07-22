@@ -191,7 +191,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
         std::ref(resamplers), std::ref(ms), 
         std::ref(cb_data), std::ref(rx_queues), 
         std::ref(cfr_queue), std::ref(cbdata_queue),std::ref(stop_signal_called));
-    std::thread t3(cfr_export_worker<NUM_CHANNELS>, std::ref(cfr_queue), double(0.1), std::ref(sender), std::ref(m_file_cfr), std::ref(stop_signal_called));
+    std::thread t3(cfr_export_worker<NUM_CHANNELS>, std::ref(cfr_queue), double(0.05), std::ref(sender), std::ref(m_file_cfr), std::ref(stop_signal_called));
     std::thread t4(cbdata_export_worker, std::ref(cbdata_queue), std::ref(m_file_cbdata), std::ref(stop_signal_called));
 
     std::this_thread::sleep_for(std::chrono::milliseconds(20000));
