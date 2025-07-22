@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # ---------- external packages ----------------
 include(FetchContent)
+include(ExternalProject)
 
 # Liquid-DSP
 set(liquid_patch git apply ${CMAKE_CURRENT_SOURCE_DIR}/patch/liquid.patch)
@@ -22,6 +23,24 @@ FetchContent_MakeAvailable(liquid)
 include_directories(${liquid_SOURCE_DIR}/include)
 link_directories(${liquid_SOURCE_DIR}/lib)
 
+# Liquid-WLAN
+ExternalProject_Add(
+  liquidwlan
+  GIT_REPOSITORY https://github.com/jgaeddert/liquid-wlan
+  GIT_TAG main
+  PREFIX ${CMAKE_BUILD_DIR}/liquidwlan
+  CONFIGURE_COMMAND ""                       
+  BUILD_COMMAND make                        
+  BUILD_IN_SOURCE 1                          
+  INSTALL_COMMAND ""    
+  LOG_DOWNLOAD ON                     
+  LOG_BUILD ON
+)
+
+set(LIQUIDWLAN_SRC_DIR ${CMAKE_SOURCE_DIR}/liquidwlan/src/liquidwlan)
+set(LIQUIDWLAN_INCLUDE_DIR ${LIQUIDWLAN_SRC_DIR}/include)
+set(LIQUIDWLAN_LIBRARY ${LIQUIDWLAN_SRC_DIR}/lib/libwlan.a)
+include_directories(${LIQUIDWLAN_INCLUDE_DIR})
 
 # ZeroMQ
 # libzmq (remove for using local zmq installation)
@@ -73,6 +92,13 @@ add_library(matlab_export_lib include/matlab_export/matlab_export.cc)
 add_library(zmq_socket include/zmq_socket/zmq_socket.cc)
 target_link_libraries(zmq_socket cppzmq)
 
+# liquid wlan 
+add_library(liquidwlan_static STATIC IMPORTED GLOBAL)
+set_target_properties(liquidwlan_static PROPERTIES
+  IMPORTED_LOCATION ${LIQUIDWLAN_LIBRARY}
+  INTERFACE_INCLUDE_DIRECTORIES ${LIQUIDWLAN_INCLUDE_DIR}
+)
+
 # ---------- Main Application  ----------------
 # source files
 set(MAIN_SRC_FILES
@@ -88,6 +114,7 @@ target_link_libraries(
   power_trigger_lib
   auto_corr_lib
   liquid
+  liquidwlan_static
   zmq_socket
   ${UHD_LIBRARIES}
   ${Boost_LIBRARIES}
@@ -121,6 +148,7 @@ foreach(SOURCE_FILE ${SANDBOX_SRC_FILES})
     signal_generator_lib
     matlab_export_lib
     liquid
+    liquidwlan_static
     zmq_socket
     ${UHD_LIBRARIES}
     ${Boost_LIBRARIES}

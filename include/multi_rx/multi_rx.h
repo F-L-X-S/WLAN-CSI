@@ -23,6 +23,7 @@
 #include <string>              
 #include <atomic>                     
 
+#include "liquid-wlan.h"
 #include <multisync/multisync.h>
 #include <zmq_socket/zmq_socket.h>
 #include <matlab_export/matlab_export.h>
