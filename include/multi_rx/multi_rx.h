@@ -245,7 +245,7 @@ void cfr_export_worker( CfrQueue_t& cfr_queue,
                 std::cout <<"!"<< std::endl;
 
                 // Clear the buffer up to the current index
-                cfr_buffer.erase(cfr_buffer.begin(), cfr_buffer.end());
+                cfr_buffer.erase(cfr_buffer.begin(), cfr_buffer.begin()+i);
 
 
                 //----------------- MATLAB Export ----------------------
