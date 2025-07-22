@@ -69,6 +69,37 @@ struct CbDataQueue_t
     std::condition_variable cv;
 };
 
+// Stream Worker starts USRP streams
+template <std::size_t num_channels>
+void stream_worker( std::array<uhd::usrp::multi_usrp::sptr, num_channels>& usrps,
+                    size_t& max_samps, 
+                    std::atomic<bool>& stop_signal_called) {
+
+    // Configure stream command
+    uhd::stream_cmd_t stream_cmd(uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS);
+    stream_cmd.num_samps = max_samps; // number of samples to receive per frame
+    stream_cmd.stream_now = false;  
+    double seconds_in_future = 0.5; 
+
+    for (auto usrp : usrps){
+            // Set the time spec to start receiving in the future
+            stream_cmd.time_spec = usrp->get_time_now() + uhd::time_spec_t(seconds_in_future);  
+            // Start USRPs streaming
+            usrp->issue_stream_cmd(stream_cmd); 
+    }
+
+    // Cyclic burst stream
+    while (!stop_signal_called.load()) {
+
+    }
+
+    // Stop streaming 
+    for (auto usrp : usrps){
+        usrp->issue_stream_cmd(uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS);
+    }
+
+}
+
 
 // RX-Worker receives samples from the USRP and pushes them into a thread-safe queue
 template <std::size_t buffer_size>
