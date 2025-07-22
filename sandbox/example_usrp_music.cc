@@ -117,7 +117,8 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     std::cout << boost::format("Resampling-Rate: %f Msps...") % (rx_resamp_rate) << std::endl;
 
     // set freq
-    uhd::tune_request_t tune_request(2220e6, 227e6);  // create a tune request with the desired frequency and local oscillator offset
+    uhd::tune_request_t tune_request(2412e6); 
+    tune_request.rf_freq_policy = uhd::tune_request_t::policy_t::POLICY_AUTO;
     std::cout << boost::format("Tune Policy: %f") % (tune_request.rf_freq_policy) << std::endl;
     usrp_0->set_rx_freq(tune_request, 0);
     usrp_1->set_rx_freq(tune_request, 0);
@@ -190,7 +191,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
         std::ref(resamplers), std::ref(ms), 
         std::ref(cb_data), std::ref(rx_queues), 
         std::ref(cfr_queue), std::ref(cbdata_queue),std::ref(stop_signal_called));
-    std::thread t3(cfr_export_worker<NUM_CHANNELS>, std::ref(cfr_queue), double(1), std::ref(sender), std::ref(m_file_cfr), std::ref(stop_signal_called));
+    std::thread t3(cfr_export_worker<NUM_CHANNELS>, std::ref(cfr_queue), double(0.1), std::ref(sender), std::ref(m_file_cfr), std::ref(stop_signal_called));
     std::thread t4(cbdata_export_worker, std::ref(cbdata_queue), std::ref(m_file_cbdata), std::ref(stop_signal_called));
 
     std::this_thread::sleep_for(std::chrono::milliseconds(20000));
