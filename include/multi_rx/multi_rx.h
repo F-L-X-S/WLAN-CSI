@@ -186,7 +186,6 @@ void cfr_export_worker( CfrQueue_t& cfr_queue,
     // Sorted and time-matched CFRs of all channels
     std::vector<std::vector<std::complex<float>>> cfr_group(num_channels);
 
-    unsigned int i;
     while (!stop_signal_called.load()) {
         // Move cfr queue to buffer
         std::unique_lock<std::mutex> lock_cfr(cfr_queue.mtx);
@@ -206,14 +205,14 @@ void cfr_export_worker( CfrQueue_t& cfr_queue,
             });
 
         // Find a group of CFRs from all channels within the max_age window
-        unsigned int i;
+        unsigned int i, j;
         for (i = 0; i < cfr_buffer.size(); ++i) {
             std::vector<const Cfr_t*> group(num_channels, nullptr); // Group of CFRs from each channel
             const auto& base = cfr_buffer[i];                       // Add initial CFR to group
             group[base.channel] = &base;
 
             // Find all CFRs around base within the max_age window
-            for (size_t j = i + 1; j < cfr_buffer.size(); ++j) {
+            for (j = i + 1; j < cfr_buffer.size(); ++j) {
                 // Next timestamp out of range -> no group existing for this base-CFR
                 if ((cfr_buffer[j].timestamp - base.timestamp) > max_age)
                     break;
@@ -233,8 +232,9 @@ void cfr_export_worker( CfrQueue_t& cfr_queue,
                 // Reset the CFR group
                 cfr_group = std::vector<std::vector<std::complex<float>>>(num_channels);
                 // Prepare CFRs sorted by channel
-                for (size_t ch = 0; ch < num_channels; ++ch)
-                    cfr_group[ch] = group[ch]->cfr;
+                for (const auto& cfr : group) {
+                    cfr_group[cfr->channel] = cfr->cfr;;
+                }
 
                 // ZMQ Export
                 sender.send(cfr_group);
@@ -242,49 +242,14 @@ void cfr_export_worker( CfrQueue_t& cfr_queue,
                 // MATLAB Export 
                 std::cout << "Exported CFR at timestamps ";
                 for (const auto& cfr : group) {
-                    std::string timestamp = std::to_string(cfr->timestamp.get_real_secs());
+                    std::string timestamp = std::to_string(cfr->timestamp.get_full_secs())+std::to_string(cfr->timestamp.get_tick_count(1000));
                     std::cout << timestamp << " ";
-                    m_file.Add(cfr_group[i], "cfr_CH" + std::to_string(cfr->channel) +"_"+timestamp);
+                    m_file.Add(cfr->cfr, "CH" + std::to_string(cfr->channel) +"_"+timestamp);
                 }
                 std::cout <<"!"<< std::endl;
 
-                // Add combined plot-commands to the MATLAB file
-                std::stringstream matlab_cmd;
-                matlab_cmd << "figure;";
-                
-                // CFR Magnitude
-                matlab_cmd << "subplot(2,1,1); hold on;";
-                for (unsigned int i = 0; i < num_channels; ++i) {
-                    std::string suffix = std::to_string(i);
-                    matlab_cmd << "plot(abs(cfr_" << suffix << "), 'DisplayName', 'RX-Channel " << suffix << "');";
-                }
-                matlab_cmd << "title('Channel Frequency Response Gain'); legend; grid on;";
-                matlab_cmd << std::endl;
-
-                // CFR Phase
-                matlab_cmd << "subplot(2,1,2); hold on;";
-                for (unsigned int i = 0; i < num_channels; ++i) {
-                    std::string suffix = std::to_string(i);
-                    matlab_cmd << "plot(angle(cfr_" << suffix << "), 'DisplayName', 'RX-Channel " << suffix << "');";
-                }
-                matlab_cmd << "title('Channel Frequency Response Phase'); legend; grid on;";
-                matlab_cmd << std::endl;
-
-                // CFR in Complex 
-                matlab_cmd << "figure;";
-                for (unsigned int i = 0; i < num_channels; ++i) {
-                    std::string suffix = std::to_string(i);
-                    matlab_cmd << "plot(real(cfr_" << suffix << "), imag(cfr_" << suffix
-                            << "), '.', 'DisplayName', 'RX-Channel " << suffix << "'); hold on;";
-                }
-                matlab_cmd << "title('CFR'); xlabel('Real'); ylabel('Imag'); axis equal; legend; grid on;";
-                matlab_cmd << std::endl;
-
-                // Add the complete command string to MATLAB export
-                m_file.Add(matlab_cmd.str());
-
                 // Clear the buffer up to the current index
-                cfr_buffer.erase(cfr_buffer.begin(), cfr_buffer.begin()+i);
+                cfr_buffer.erase(cfr_buffer.begin(), cfr_buffer.begin()+j);
 
                 // Break queue processing 
                 break;
@@ -298,6 +263,34 @@ void cfr_export_worker( CfrQueue_t& cfr_queue,
         };
     }
 
+    // Add combined plot-commands to the MATLAB file
+    for (auto& varname : m_file.GetVarNames()) {
+        std::stringstream matlab_cmd;
+        matlab_cmd << "figure;";
+
+        // CFR Magnitude
+        matlab_cmd << "subplot(2,1,1); hold on;";
+        matlab_cmd << "plot(abs("<< varname <<"), 'DisplayName', '" << varname << "');";
+        matlab_cmd << "title('Channel Frequency Response Gain'); legend; grid on;";
+        matlab_cmd << std::endl;
+
+        // CFR Phase
+        matlab_cmd << "subplot(2,1,2); hold on;";
+        matlab_cmd << "plot(angle("<< varname <<"), 'DisplayName', '" << varname << "');";
+        matlab_cmd << "title('Channel Frequency Response Phase'); legend; grid on;";
+        matlab_cmd << std::endl;
+
+        // CFR in Complex 
+        matlab_cmd << "figure;";
+        matlab_cmd << "plot(real("<< varname <<"), imag("<< varname
+                <<"), '.', 'DisplayName', '"<< varname <<"'); hold on;";
+        matlab_cmd << "title('CFR'); xlabel('Real'); ylabel('Imag'); axis equal; legend; grid on;";
+        matlab_cmd << std::endl;
+
+        // Add the complete command string to MATLAB export
+        m_file.Add(matlab_cmd.str());
+    }
+
 }
 
 // Export-Worker processes queued CB-Data from a Sync-worker and exports them to a MATLAB file
@@ -306,8 +299,7 @@ void cbdata_export_worker(  CbDataQueue_t& cbdata_queue,
                             std::atomic<bool>& stop_signal_called) {
 
     // Queued cb-data 
-    std::vector<CallbackData_t> cbdata_buffer; 
-    std::vector<std::string> cbdata_varnames;       
+    std::vector<CallbackData_t> cbdata_buffer;    
 
     unsigned int i;
     while (!stop_signal_called.load()) {
@@ -326,10 +318,9 @@ void cbdata_export_worker(  CbDataQueue_t& cbdata_queue,
 
         // Export CB-Data buffer to MATLAB file
         for (unsigned int i = 0; i < cbdata_buffer.size(); ++i) {
-            std::string timestamp = std::to_string(cbdata_buffer[i].timestamp.get_real_secs());
+            std::string timestamp = std::to_string(cbdata_buffer[i].timestamp.get_full_secs())+std::to_string(cbdata_buffer[i].timestamp.get_tick_count(1000));
             std::string suffix = "CH" + std::to_string(cbdata_buffer[i].channel)+"_"+ timestamp;
             m_file.Add(cbdata_buffer[i].buffer, suffix);
-            cbdata_varnames.push_back(suffix);
         }
 
         // Clear the buffer
@@ -341,9 +332,10 @@ void cbdata_export_worker(  CbDataQueue_t& cbdata_queue,
 
     // CFR in Complex 
     matlab_cmd << "figure;";
-    for (auto& varname : cbdata_varnames    ) {
+    for (auto& varname : m_file.GetVarNames()) {
         matlab_cmd << "plot(real("<< varname <<"), imag("<< varname
                 <<"), '.', 'DisplayName', '"<< varname <<"'); hold on;";
+        matlab_cmd << std::endl;
     }
     matlab_cmd << "title('Received Data'); xlabel('Real'); ylabel('Imag'); axis equal; legend; grid on;";
     matlab_cmd << std::endl;
