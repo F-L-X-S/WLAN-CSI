@@ -236,29 +236,22 @@ void cfr_export_worker( CfrQueue_t& cfr_queue,
                 for (size_t ch = 0; ch < num_channels; ++ch)
                     cfr_group[ch] = group[ch]->cfr;
 
-                //----------------- ZMQ Export ----------------------
+                // ZMQ Export
                 sender.send(cfr_group);
+
+                // MATLAB Export 
                 std::cout << "Exported CFR at timestamps ";
                 for (const auto& cfr : group) {
-                    std::cout << cfr[0].timestamp.get_full_secs() << " ";
+                    std::string timestamp = std::to_string(cfr->timestamp.get_real_secs());
+                    std::cout << timestamp << " ";
+                    m_file.Add(cfr_group[i], "cfr_CH" + std::to_string(cfr->channel) +"_"+timestamp);
                 }
                 std::cout <<"!"<< std::endl;
 
-                // Clear the buffer up to the current index
-                cfr_buffer.erase(cfr_buffer.begin(), cfr_buffer.begin()+i);
-
-
-                //----------------- MATLAB Export ----------------------
-                // Export CFRs to MATLAB file
-                for (unsigned int i = 0; i < num_channels; ++i) {
-                    std::string suffix = std::to_string(i);
-                    m_file.Add(cfr_group[i], "cfr_" + suffix);
-                }
-
                 // Add combined plot-commands to the MATLAB file
                 std::stringstream matlab_cmd;
-
                 matlab_cmd << "figure;";
+                
                 // CFR Magnitude
                 matlab_cmd << "subplot(2,1,1); hold on;";
                 for (unsigned int i = 0; i < num_channels; ++i) {
@@ -289,6 +282,9 @@ void cfr_export_worker( CfrQueue_t& cfr_queue,
 
                 // Add the complete command string to MATLAB export
                 m_file.Add(matlab_cmd.str());
+
+                // Clear the buffer up to the current index
+                cfr_buffer.erase(cfr_buffer.begin(), cfr_buffer.begin()+i);
 
                 // Break queue processing 
                 break;
@@ -330,7 +326,8 @@ void cbdata_export_worker(  CbDataQueue_t& cbdata_queue,
 
         // Export CB-Data buffer to MATLAB file
         for (unsigned int i = 0; i < cbdata_buffer.size(); ++i) {
-            std::string suffix = "CH" + std::to_string(cbdata_buffer[i].channel)+"_"+ std::to_string(cbdata_buffer[i].timestamp.get_tick_count(1000));
+            std::string timestamp = std::to_string(cbdata_buffer[i].timestamp.get_real_secs());
+            std::string suffix = "CH" + std::to_string(cbdata_buffer[i].channel)+"_"+ timestamp;
             m_file.Add(cbdata_buffer[i].buffer, suffix);
             cbdata_varnames.push_back(suffix);
         }
