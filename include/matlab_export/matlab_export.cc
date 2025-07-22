@@ -42,12 +42,13 @@
 
  /**
   * @brief Function to export a vector of complex numbers to a MATLAB file. The vector is
-  * appended to the end of the file. The function takes the vector, a variable name, and the outputfile
+  * appended to the end of the file. Tha variable name is stored in the class instance. 
   * 
   * @param x 
   * @param varname  
   */
  MatlabExport& MatlabExport::Add(const std::vector<std::complex<float>>& x, const std::string& varname) {
+    // Add data to M-File
     file_ << varname << " = [ ...\n";
     for (size_t i = 0; i < x.size(); ++i) {
         float re = x[i].real();
@@ -59,17 +60,22 @@
             file_ << " ...\n";
     }
     file_ << "];" << std::endl;
+
+    // Store the variable name
+    varnames_.push_back(varname);
+
     return *this;
 }
 
  /**
   * @brief Function to export a vector of real numbers to a MATLAB file. The vector is
-  * appended to the end of the file. The function takes the vector, a variable name, and the outputfile
+  * appended to the end of the file. Tha variable name is stored in the class instance. 
   * 
   * @param x 
   * @param varname 
   */
  MatlabExport& MatlabExport::Add(const std::vector<float>& x, const std::string& varname) {
+    // Add data to M-File
     file_ << varname << " = [ ...\n";
     for (size_t i = 0; i < x.size(); ++i) {
         file_ << x[i];
@@ -79,6 +85,10 @@
             file_ << " ...\n";
     }
     file_ << "];" << std::endl;
+
+    // Store the variable name
+    varnames_.push_back(varname);
+
     return *this;
 }
 
@@ -91,4 +101,13 @@
 MatlabExport& MatlabExport::Add(const std::string& commandline){
     file_ << commandline << std::endl;
     return *this;
+}
+
+/**
+ * @brief Function to get the variable names stored in the class instance.
+ * 
+ * @return std::vector<std::string> 
+ */
+std::vector<std::string> MatlabExport::GetVarNames() const {
+    return varnames_;
 }
