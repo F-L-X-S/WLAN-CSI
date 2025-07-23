@@ -73,9 +73,13 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     MatlabExport m_file_cbdata(OUTFILE_CBDATA);
 
    // Receiver settings 
+   // 2412MHz/20MHz (Channel 1)=120.6 
+   // -> 433.55MHz/120.6 = 3.5949MHz 
+   // -> 3.5949MHz/64 subcarrier = 56.171 kHz subcarrier-spacing
     unsigned long int ADC_RATE = 100e6;
-    double rx_rate = 20e6f;
-    double center_freq = 2412e6;
+    double rx_rate = 3.5959e6f;             // Bandwidth 
+    double center_freq = 433.55e6;          // Carrier frequency in free band 
+    
     // NOTE : the sample rate computation MUST be in double precision so
     //        that the UHD can compute its decimation rate properly
     unsigned int decim_rate = (unsigned int)(ADC_RATE / rx_rate);
