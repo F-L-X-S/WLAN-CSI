@@ -21,7 +21,12 @@
 #include <mutex>                    
 #include <condition_variable>         
 #include <string>              
-#include <atomic>                     
+#include <atomic>    
+
+#include <boost/algorithm/string.hpp>
+#include <boost/format.hpp>
+#include <boost/thread.hpp>
+#include <iostream>
 
 #include <multisync/multisync.h>
 #include <zmq_socket/zmq_socket.h>
@@ -73,7 +78,49 @@ struct CbDataQueue_t
 template <std::size_t num_channels>
 void stream_worker( std::array<uhd::usrp::multi_usrp::sptr, num_channels>& usrps,
                     size_t& max_samps, 
+                    double& usrp_rx_rate,
+                    double& center_freq,
                     std::atomic<bool>& stop_signal_called) {
+
+
+    // Lock mboard clocks
+    unsigned int i;
+    for (i=0; i < num_channels; ++i){
+        std::string clk_src = i==0 ? "internal":"mimo";
+        usrps[i]->set_clock_source(clk_src, 0);                         // internal clock source for device 0 / mimo for other devices 
+        if (i>0) usrps[i]->set_time_source(clk_src, 0);                 // mimo time source for devices > 0 
+        if (i==0) usrps[i]->set_time_now(uhd::time_spec_t(0.0), 0);     // initialize device time
+    };
+
+    //sleep a bit while the slaves lock its time to the master
+    boost::this_thread::sleep(boost::posix_time::milliseconds(100));
+
+    // Configure tune request for desired center frequency 
+    uhd::tune_request_t tune_request(center_freq); 
+    tune_request.rf_freq_policy = uhd::tune_request_t::policy_t::POLICY_AUTO;
+    std::cout << boost::format("Tune Policy: %f") % (tune_request.rf_freq_policy) << std::endl;
+
+    for (auto usrp : usrps){
+        //always select the subdevice first, the channel mapping affects the other settings
+        usrp->set_rx_subdev_spec(uhd::usrp::subdev_spec_t("A:0"), 0);           //set the device 0 to use the A RX frontend (RX channel 0)
+        usrp->set_rx_rate(usrp_rx_rate, uhd::usrp::multi_usrp::ALL_MBOARDS);    // set sample rate
+        usrp->set_rx_freq(tune_request, 0);                                     // set RX Frequency  
+        usrp->set_rx_gain(30, 0);                                               // set the rf gain
+        usrp->set_rx_antenna("RX2", 0);                                         // set the antenna
+    }
+
+    // Print device configuration 
+    for (i=0; i < num_channels; ++i){
+        std::cout << boost::format("---- Configuration  Device %1% ----") % i << std::endl;
+        std::cout << boost::format("Clock-src: %s") % usrps[i]->get_clock_source(0) << std::endl;
+        std::cout << boost::format("Time-src: %s") % usrps[i]->get_time_source(0) << std::endl;
+        std::cout << boost::format("Required RX Rate: %f Msps...") % (usrp_rx_rate / 1e6) << std::endl;
+        std::cout << boost::format("RX Rate: %f Msps...") % (usrps[i]->get_rx_rate(0) / 1e6) << std::endl;
+        std::cout << boost::format("Required RX Freq: %f MHz...") % (center_freq / 1e6) << std::endl;
+        std::cout << boost::format("RX Freq: %f MHz...") % (usrps[i]->get_rx_freq(0) / 1e6) << std::endl;
+        std::cout << boost::format("RX Gain: %f dB...") % usrps[i]->get_rx_gain(0) << std::endl;
+        std::cout << boost::format("RX Bandwidth: %f MHz...") % (usrps[i]->get_rx_bandwidth(0) / 1e6) << std::endl << std::endl;
+    };
 
     // Configure stream command
     uhd::stream_cmd_t stream_cmd(uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS);
@@ -86,12 +133,12 @@ void stream_worker( std::array<uhd::usrp::multi_usrp::sptr, num_channels>& usrps
             stream_cmd.time_spec = usrp->get_time_now() + uhd::time_spec_t(seconds_in_future);  
             // Start USRPs streaming
             usrp->issue_stream_cmd(stream_cmd); 
-    }
+    };
 
     // Cyclic burst stream
     while (!stop_signal_called.load()) {
 
-    }
+    };
 
     // Stop streaming 
     for (auto usrp : usrps){
