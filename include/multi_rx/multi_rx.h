@@ -33,11 +33,11 @@
 #include <matlab_export/matlab_export.h>
 
 // Typedefs
-using RxSample_t = std::complex<float>;   // Received samples type
+using Sample_t = std::complex<float>;   // Received samples type
 
 struct RxSampleBlock_t
 {
-    std::vector<RxSample_t> samples;                    // Received samples
+    std::vector<Sample_t> samples;                    // Received samples
     uhd::time_spec_t timestamp;                         // Timestamp of the sample block
 };
 
@@ -78,7 +78,7 @@ struct CbDataQueue_t
 template <std::size_t num_channels>
 void stream_worker( std::array<uhd::usrp::multi_usrp::sptr, num_channels>& usrps,
                     size_t& max_samps, 
-                    double& usrp_rx_rate,
+                    double& txrx_rate,
                     double& center_freq,
                     std::atomic<bool>& stop_signal_called) {
 
@@ -103,10 +103,15 @@ void stream_worker( std::array<uhd::usrp::multi_usrp::sptr, num_channels>& usrps
     for (auto usrp : usrps){
         //always select the subdevice first, the channel mapping affects the other settings
         usrp->set_rx_subdev_spec(uhd::usrp::subdev_spec_t("A:0"), 0);           //set the device 0 to use the A RX frontend (RX channel 0)
-        usrp->set_rx_rate(usrp_rx_rate, uhd::usrp::multi_usrp::ALL_MBOARDS);    // set sample rate
+        usrp->set_tx_subdev_spec(uhd::usrp::subdev_spec_t("A:0"), 0);           //set the device 0 to use the A TX frontend (TX channel 0)
+        usrp->set_rx_rate(txrx_rate, uhd::usrp::multi_usrp::ALL_MBOARDS);       // set RX sample rate
+        usrp->set_tx_rate(txrx_rate, uhd::usrp::multi_usrp::ALL_MBOARDS);       // set TX sample rate
         usrp->set_rx_freq(tune_request, 0);                                     // set RX Frequency  
-        usrp->set_rx_gain(30, 0);                                               // set the rf gain
-        usrp->set_rx_antenna("RX2", 0);                                         // set the antenna
+        usrp->set_tx_freq(tune_request, 0);                                     // set TX Frequency  
+        usrp->set_rx_gain(30, 0);                                               // set the RX gain
+        usrp->set_tx_gain(10, 0);                                               // set the RX gain
+        usrp->set_rx_antenna("RX2", 0);                                         // set the RX antenna
+        usrp->set_tx_antenna("TX/RX", 0);                                       // set the TX antenna
     }
 
     // Print device configuration 
@@ -114,12 +119,22 @@ void stream_worker( std::array<uhd::usrp::multi_usrp::sptr, num_channels>& usrps
         std::cout << boost::format("---- Configuration  Device %1% ----") % i << std::endl;
         std::cout << boost::format("Clock-src: %s") % usrps[i]->get_clock_source(0) << std::endl;
         std::cout << boost::format("Time-src: %s") % usrps[i]->get_time_source(0) << std::endl;
-        std::cout << boost::format("Required RX Rate: %f Msps...") % (usrp_rx_rate / 1e6) << std::endl;
-        std::cout << boost::format("RX Rate: %f Msps...") % (usrps[i]->get_rx_rate(0) / 1e6) << std::endl;
-        std::cout << boost::format("Required RX Freq: %f MHz...") % (center_freq / 1e6) << std::endl;
-        std::cout << boost::format("RX Freq: %f MHz...") % (usrps[i]->get_rx_freq(0) / 1e6) << std::endl;
-        std::cout << boost::format("RX Gain: %f dB...") % usrps[i]->get_rx_gain(0) << std::endl;
-        std::cout << boost::format("RX Bandwidth: %f MHz...") % (usrps[i]->get_rx_bandwidth(0) / 1e6) << std::endl << std::endl;
+
+        std::cout << boost::format("TX Configuration:") << std::endl;
+        std::cout << boost::format("\tRequired TX Rate: %f Msps...") % (txrx_rate / 1e6) << std::endl;
+        std::cout << boost::format("\tTX Rate: %f Msps...") % (usrps[i]->get_tx_rate(0) / 1e6) << std::endl;
+        std::cout << boost::format("\tRequired TX Freq: %f MHz...") % (center_freq / 1e6) << std::endl;
+        std::cout << boost::format("\tTX Freq: %f MHz...") % (usrps[i]->get_tx_freq(0) / 1e6) << std::endl;
+        std::cout << boost::format("\tTX Gain: %f dB...") % usrps[i]->get_tx_gain(0) << std::endl;
+        std::cout << boost::format("\tTX Bandwidth: %f MHz...") % (usrps[i]->get_tx_bandwidth(0) / 1e6) << std::endl;
+
+        std::cout << boost::format("RX Configuration:") << std::endl;
+        std::cout << boost::format("\tRequired RX Rate: %f Msps...") % (txrx_rate / 1e6) << std::endl;
+        std::cout << boost::format("\tRX Rate: %f Msps...") % (usrps[i]->get_rx_rate(0) / 1e6) << std::endl;
+        std::cout << boost::format("\tRequired RX Freq: %f MHz...") % (center_freq / 1e6) << std::endl;
+        std::cout << boost::format("\tRX Freq: %f MHz...") % (usrps[i]->get_rx_freq(0) / 1e6) << std::endl;
+        std::cout << boost::format("\tRX Gain: %f dB...") % usrps[i]->get_rx_gain(0) << std::endl;
+        std::cout << boost::format("\tRX Bandwidth: %f MHz...") % (usrps[i]->get_rx_bandwidth(0) / 1e6) << std::endl << std::endl;
     };
 
     // Configure stream command
@@ -147,6 +162,33 @@ void stream_worker( std::array<uhd::usrp::multi_usrp::sptr, num_channels>& usrps
 
 }
 
+// TX-Worker sends specified buffer, repeating after cycle time [ms]
+void tx_worker(uhd::tx_streamer::sptr tx_stream,
+                std::vector<Sample_t>& buff,
+                unsigned int cycle_time,
+                std::atomic<bool>& stop_signal_called){
+
+    uhd::tx_metadata_t md;
+    std::vector<std::complex<float>*> buffs(1, &buff.front());
+    size_t samples_sent=0;
+    while (!stop_signal_called.load()) {
+        const size_t n_tx = tx_stream->send(buffs, buff.size(), md);
+        samples_sent+=n_tx;
+        md.start_of_burst = false;
+        md.has_time_spec  = false;
+
+        // send a mini EOB packet
+        md.end_of_burst = true;
+        tx_stream->send("", 0, md);
+
+        //sleep after transmitting buffer 
+        if (samples_sent>=buff.size()){
+            samples_sent = 0;
+            boost::this_thread::sleep(boost::posix_time::milliseconds(cycle_time));
+        };
+    }
+}
+
 
 // RX-Worker receives samples from the USRP and pushes them into a thread-safe queue
 template <std::size_t buffer_size>
@@ -154,7 +196,7 @@ void rx_worker( uhd::rx_streamer::sptr rx_stream,
                 RxSamplesQueue_t& q,
                 std::atomic<bool>& stop_signal_called) {
     uhd::rx_metadata_t md;
-    std::vector<RxSample_t> buff(buffer_size);
+    std::vector<Sample_t> buff(buffer_size);
 
     while (!stop_signal_called.load()) {
         size_t n_rx = rx_stream->recv(&buff.front(), buff.size(), md, 1.0);
