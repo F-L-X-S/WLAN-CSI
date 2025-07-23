@@ -267,7 +267,7 @@ int main(int argc, char*argv[])
 
             // Store the CFR (only once)
             if (cb_data[j].buffer.size() && !cb_data[j].cfr.size()){
-                ms.GetCfr(j, &cb_data[j].cfr, M);                               // Write cfr to callback data
+                ms.GetCfr(j, &cb_data[j].cfr);                                  // Write cfr to callback data
                 cfr[j].assign(cb_data[j].cfr.begin(), cb_data[j].cfr.end());    // Copy the CFR to the multidimensional buffer   
             };
         };
