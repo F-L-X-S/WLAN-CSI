@@ -127,22 +127,22 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     Sync_t ms(NUM_CHANNELS, {M, cp_len, taper_len, p}, callback, userdata);
 
     // Start receiving...
-    std::thread t5(stream_worker<NUM_CHANNELS>, std::ref(usrps), 
+    std::thread t0(stream_worker<NUM_CHANNELS>, std::ref(usrps), 
         std::ref(max_samps), std::ref(usrp_rx_rate), std::ref(center_freq), 
         std::ref(stop_signal_called));
 
-    std::thread t0(rx_worker<4096>, rx_stream_0, std::ref(rx_queues[0]), std::ref(stop_signal_called));
-    std::thread t1(rx_worker<4096>, rx_stream_1, std::ref(rx_queues[1]), std::ref(stop_signal_called));
+    std::thread t1(rx_worker<4096>, rx_stream_0, std::ref(rx_queues[0]), std::ref(stop_signal_called));
+    std::thread t2(rx_worker<4096>, rx_stream_1, std::ref(rx_queues[1]), std::ref(stop_signal_called));
 
-    std::thread t2(sync_worker<NUM_CHANNELS, Sync_t, CallbackData_t>, 
+    std::thread t3(sync_worker<NUM_CHANNELS, Sync_t, CallbackData_t>, 
         std::ref(resamplers), std::ref(ms), 
         std::ref(cb_data), std::ref(rx_queues), 
         std::ref(cfr_queue), std::ref(cbdata_queue),std::ref(stop_signal_called));
     
-    std::thread t3(cfr_export_worker<NUM_CHANNELS>, std::ref(cfr_queue), 
+    std::thread t4(cfr_export_worker<NUM_CHANNELS>, std::ref(cfr_queue), 
         double(0.05), std::ref(sender), std::ref(m_file_cfr), std::ref(stop_signal_called));
     
-    std::thread t4(cbdata_export_worker, std::ref(cbdata_queue), std::ref(m_file_cbdata), std::ref(stop_signal_called));
+    std::thread t5(cbdata_export_worker, std::ref(cbdata_queue), std::ref(m_file_cbdata), std::ref(stop_signal_called));
 
     std::this_thread::sleep_for(std::chrono::milliseconds(20000));
     stop_signal_called.store(true);
@@ -152,12 +152,12 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     cfr_queue.cv.notify_all();
     cbdata_queue.cv.notify_all();
 
-    t5.join();
     t0.join();
     t1.join();
     t2.join();
     t3.join();
     t4.join();
+    t5.join();
 
     for (auto& r : resamplers) {
     resamp_crcf_destroy(r);
