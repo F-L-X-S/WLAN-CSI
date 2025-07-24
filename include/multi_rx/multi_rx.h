@@ -78,7 +78,8 @@ struct CbDataQueue_t
 template <std::size_t num_channels>
 void stream_worker( std::array<uhd::usrp::multi_usrp::sptr, num_channels>& usrps,
                     size_t& max_samps, 
-                    double& txrx_rate,
+                    double& tx_rate,
+                    double& rx_rate,
                     double& center_freq,
                     std::atomic<bool>& stop_signal_called) {
 
@@ -104,12 +105,12 @@ void stream_worker( std::array<uhd::usrp::multi_usrp::sptr, num_channels>& usrps
         //always select the subdevice first, the channel mapping affects the other settings
         usrp->set_rx_subdev_spec(uhd::usrp::subdev_spec_t("A:0"), 0);           //set the device 0 to use the A RX frontend (RX channel 0)
         usrp->set_tx_subdev_spec(uhd::usrp::subdev_spec_t("A:0"), 0);           //set the device 0 to use the A TX frontend (TX channel 0)
-        usrp->set_rx_rate(txrx_rate, uhd::usrp::multi_usrp::ALL_MBOARDS);       // set RX sample rate
-        usrp->set_tx_rate(txrx_rate, uhd::usrp::multi_usrp::ALL_MBOARDS);       // set TX sample rate
+        usrp->set_rx_rate(rx_rate, uhd::usrp::multi_usrp::ALL_MBOARDS);       // set RX sample rate
+        usrp->set_tx_rate(tx_rate, uhd::usrp::multi_usrp::ALL_MBOARDS);       // set TX sample rate
         usrp->set_rx_freq(tune_request, 0);                                     // set RX Frequency  
         usrp->set_tx_freq(tune_request, 0);                                     // set TX Frequency  
-        usrp->set_rx_gain(30, 0);                                               // set the RX gain
-        usrp->set_tx_gain(10, 0);                                               // set the RX gain
+        usrp->set_rx_gain(20, 0);                                               // set the RX gain
+        usrp->set_tx_gain(10, 0);                                               // set the TX gain
         usrp->set_rx_antenna("RX2", 0);                                         // set the RX antenna
         usrp->set_tx_antenna("TX/RX", 0);                                       // set the TX antenna
     }
@@ -121,7 +122,7 @@ void stream_worker( std::array<uhd::usrp::multi_usrp::sptr, num_channels>& usrps
         std::cout << boost::format("Time-src: %s") % usrps[i]->get_time_source(0) << std::endl;
 
         std::cout << boost::format("TX Configuration:") << std::endl;
-        std::cout << boost::format("\tRequired TX Rate: %f Msps...") % (txrx_rate / 1e6) << std::endl;
+        std::cout << boost::format("\tRequired TX Rate: %f Msps...") % (tx_rate / 1e6) << std::endl;
         std::cout << boost::format("\tTX Rate: %f Msps...") % (usrps[i]->get_tx_rate(0) / 1e6) << std::endl;
         std::cout << boost::format("\tRequired TX Freq: %f MHz...") % (center_freq / 1e6) << std::endl;
         std::cout << boost::format("\tTX Freq: %f MHz...") % (usrps[i]->get_tx_freq(0) / 1e6) << std::endl;
@@ -129,7 +130,7 @@ void stream_worker( std::array<uhd::usrp::multi_usrp::sptr, num_channels>& usrps
         std::cout << boost::format("\tTX Bandwidth: %f MHz...") % (usrps[i]->get_tx_bandwidth(0) / 1e6) << std::endl;
 
         std::cout << boost::format("RX Configuration:") << std::endl;
-        std::cout << boost::format("\tRequired RX Rate: %f Msps...") % (txrx_rate / 1e6) << std::endl;
+        std::cout << boost::format("\tRequired RX Rate: %f Msps...") % (rx_rate / 1e6) << std::endl;
         std::cout << boost::format("\tRX Rate: %f Msps...") % (usrps[i]->get_rx_rate(0) / 1e6) << std::endl;
         std::cout << boost::format("\tRequired RX Freq: %f MHz...") % (center_freq / 1e6) << std::endl;
         std::cout << boost::format("\tRX Freq: %f MHz...") % (usrps[i]->get_rx_freq(0) / 1e6) << std::endl;

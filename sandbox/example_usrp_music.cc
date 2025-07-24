@@ -31,7 +31,7 @@
 #include <zmq_socket/zmq_socket.h>
 
 #define NUM_CHANNELS 2                                          // Number of Channels (USRP-devices)   
-#define SYMBOLS_PER_FRAME 3                                     // Number of Symbols to send per frame 
+#define SYMBOLS_PER_FRAME 1                                     // Number of Symbols to send per frame 
 #define OUTFILE_CFR "./matlab/example_usrp_music/cfr.m"         // Output file in MATLAB-format to store results
 #define OUTFILE_CBDATA "./matlab/example_usrp_music/cbdata.m"   // Output file in MATLAB-format to store results
 #define EXPORT_INTERFACE 'tcp://localhost:5555'                 // Interface for zmq socket
@@ -73,26 +73,32 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     MatlabExport m_file_cfr(OUTFILE_CFR);
     MatlabExport m_file_cbdata(OUTFILE_CBDATA);
 
-    // TX/RX Settings 
-    // 2412MHz/20MHz (Channel 1)=120.6 
-    // -> 433.55MHz/120.6 = 3.5949MHz 
-    // -> 3.5949MHz/64 subcarrier = 56.171 kHz subcarrier-spacing
+    // USRP Constants
+    unsigned long int DAC_RATE = 400e6;     // USRP DAC Rate (N210 fixed to 400MHz)
     unsigned long int ADC_RATE = 100e6;     // USRP ADC Rate (N210 fixed to 100MHz)
-    double txrx_rate = 3.5959e6f;           // Bandwidth 
+
+    // TX/RX Settings 
+    double bandwidth = 4e6f;                // Bandwidth 
     double center_freq = 433.55e6;          // Carrier frequency in free band 
-    
+    double txrx_rate = 4*bandwidth;         // Sample rate  
+
+    // TX 
+    // NOTE : the sample rate computation MUST be in double precision so
+    //        that the UHD can compute its interpolation rate properly
+    unsigned int interp_rate = (unsigned int)(DAC_RATE / txrx_rate);
+    interp_rate = (interp_rate >> 2) << 2;      // ensure multiple of 4
+    double usrp_tx_rate = DAC_RATE / (double)interp_rate;
+
+    // RX
     // NOTE : the sample rate computation MUST be in double precision so
     //        that the UHD can compute its decimation rate properly
     unsigned int decim_rate = (unsigned int)(ADC_RATE / txrx_rate);
-    // ensure multiple of 2
-    decim_rate = (decim_rate >> 1) << 1;
-    // compute usrp sampling rate
-    double usrp_txrx_rate = ADC_RATE / (float)decim_rate;
-
+    decim_rate = (decim_rate >> 1) << 1;        // ensure multiple of 2
+    double usrp_rx_rate = ADC_RATE / (float)decim_rate;
 
     // ---------------------- Signal Generation in complex baseband ----------------------
-    unsigned int M           = 64;      // number of subcarriers 
-    unsigned int cp_len      = 16;      // cyclic prefix length (800ns for 20MHz => 16 Sample)
+    unsigned int M           = 32;      // number of subcarriers 
+    unsigned int cp_len      = 8;      // cyclic prefix length (800ns for 20MHz => 16 Sample)
     unsigned int taper_len   = 4;       // window taper length 
     unsigned char p[M];                 // subcarrier allocation array
 
@@ -111,7 +117,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     // create frame generator
     ofdmframegen fg = ofdmframegen_create(M, cp_len, taper_len, p);
 
-    std::vector<std::complex<float>> tx_base(frame_samples);     // complex baseband signal buffer
+    std::complex<float> tx_base[frame_samples];                  // complex baseband signal buffer
     std::vector<std::complex<float>> X(M);                       // channelized symbols
     unsigned int n=0;                                            // Sample number in time domains
 
@@ -144,10 +150,29 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
         n += frame_len;
     }
 
-   // ---------------------- Receiver settings ----------------------
-    // compute the resampling rate
-    float rx_resamp_rate = txrx_rate / usrp_txrx_rate;
+    // TX half band resampler -> interpolation by 2 
+    resamp2_crcf interp = resamp2_crcf_create(7,0.0f,40.0f);
+    std::vector<std::complex<float>> tx_base_interp(2*n);
+    for (unsigned int j=0; j<80; j++)
+        resamp2_crcf_interp_execute(interp, tx_base[j], &tx_base_interp[2*j]);
 
+    // TX Arbitrary Resampler 
+    // TODO: Get actual usrp tx rate and overwrite usrp_tx_rate
+    double tx_resamp_rate = usrp_tx_rate / txrx_rate;
+    std::cout << boost::format("TX Resampling Rate (usrp-rate/tx-rate): %f ") % (tx_resamp_rate) << std::endl;
+
+    unsigned int nw, tx_len = (unsigned int)(frame_samples*ceil(tx_resamp_rate)*2);
+    std::vector<std::complex<float>> tx_data(tx_len);
+    resamp_crcf resamp_tx = resamp_crcf_create(tx_resamp_rate,7,0.4f,60.0f,64);
+    resamp_crcf_set_rate(resamp_tx, tx_resamp_rate);
+    n=0;
+    for (unsigned int j=0; j<tx_base_interp.size(); j++) {
+        resamp_crcf_execute(resamp_tx, tx_base_interp[j], &tx_data[n], &nw);
+        n += nw;
+    };
+    resamp_crcf_destroy(resamp_tx);
+
+   // ---------------------- Receiver settings ----------------------
     //create USRP devices
     std::array<uhd::usrp::multi_usrp::sptr, 2> usrps {
         uhd::usrp::multi_usrp::make("addr=192.168.10.3"), 
@@ -164,16 +189,16 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     // TX stream configuration 
     uhd::tx_streamer::sptr tx_stream_0 = usrps[0]->get_tx_stream(stream_args); 
 
-    // Resamplers
+    // RX Resampling rate = baseband-bw/rx-bandwidth
+    // TODO: Get actual usrp rx rate and overwrite usrp_rx_rate
+    double rx_resamp_rate = txrx_rate / usrp_rx_rate;
+    std::cout << boost::format("RX Resampling Rate (usrp-rate/rx-rate): %f ") % (rx_resamp_rate) << std::endl;
+
+    // RX Resamplers
     std::array<resamp_crcf, 2> resamplers = {
-        resamp_crcf_create_default(rx_resamp_rate),
-        resamp_crcf_create_default(rx_resamp_rate)
+        resamp_crcf_create_default(0.5*rx_resamp_rate),
+        resamp_crcf_create_default(0.5*rx_resamp_rate)
     };
-     
-    // Thread-safe queues 
-    std::array<RxSamplesQueue_t, 2> rx_queues;
-    CfrQueue_t cfr_queue;
-    CbDataQueue_t cbdata_queue;
 
     // callback data
     std::array<CallbackData_t, NUM_CHANNELS> cb_data;
@@ -187,10 +212,16 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     ofdmframe_init_default_sctype(M, p);
     Sync_t ms(NUM_CHANNELS, {M, cp_len, taper_len, p}, callback, userdata);
 
+    // Thread-safe queues 
+    std::array<RxSamplesQueue_t, 2> rx_queues;
+    CfrQueue_t cfr_queue;
+    CbDataQueue_t cbdata_queue;
+
     // Start receiving...
     std::thread t0(stream_worker<NUM_CHANNELS>, std::ref(usrps), 
-        std::ref(max_samps), std::ref(usrp_txrx_rate), std::ref(center_freq), 
+        std::ref(max_samps), std::ref(usrp_tx_rate), std::ref(usrp_rx_rate), std::ref(center_freq), 
         std::ref(stop_signal_called));
+    std::this_thread::sleep_for(std::chrono::milliseconds(3000));
 
     std::thread t1(rx_worker<4096>, rx_stream_0, std::ref(rx_queues[0]), std::ref(stop_signal_called));
     std::thread t2(rx_worker<4096>, rx_stream_1, std::ref(rx_queues[1]), std::ref(stop_signal_called));
@@ -206,7 +237,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     std::thread t5(cbdata_export_worker, std::ref(cbdata_queue), std::ref(m_file_cbdata), std::ref(stop_signal_called));
 
     // Start Sending...
-    std::thread t6(tx_worker, std::ref(tx_stream_0), std::ref(tx_base), 500, std::ref(stop_signal_called));
+    std::thread t6(tx_worker, std::ref(tx_stream_0), std::ref(tx_data), 500, std::ref(stop_signal_called));
 
     // Wait for stop signal...
     std::this_thread::sleep_for(std::chrono::milliseconds(20000));
