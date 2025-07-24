@@ -248,7 +248,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     std::thread t6(tx_worker, std::ref(tx_stream_0), std::ref(tx_data), 250, std::ref(stop_signal_called));
 
     // ---------------------- Continue in main thread ----------------------
-    std::this_thread::sleep_for(std::chrono::milliseconds(20000));
+    std::this_thread::sleep_for(std::chrono::milliseconds(60000));
     stop_signal_called.store(true);
 
     rx_queues[0].cv.notify_all();
