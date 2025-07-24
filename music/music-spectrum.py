@@ -75,14 +75,14 @@ class MusicSpectrum(PyQt6.QtWidgets.QApplication):
 
 		# Initialize MUSIC scanning angles, steering vectors
    		# steering vectors are the phases of the received Signal as function of angle theta 
-		self.scanning_angles = np.linspace(-np.pi / 2, np.pi / 2, 180) 
+		self.scanning_angles = np.linspace(-np.pi / 2, np.pi / 2, 1800) 
 		self.steering_vectors = np.exp(-1.0j * np.outer(np.pi * np.sin(self.scanning_angles), np.arange(self.antennas_per_row)))
 		self.spatial_spectrum = None
 
 		# Poll CSI from socket
 		self.timer = PyQt6.QtCore.QTimer()
 		self.timer.timeout.connect(self.pollSocket)
-		self.timer.start(100) # 100ms
+		self.timer.start(50) # 100ms
 
 
 	def exec(self):

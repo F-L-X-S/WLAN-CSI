@@ -57,7 +57,15 @@ class MatlabExport {
      */
     MatlabExport& Add(const std::string& commandline);
 
+    /**
+     * @brief Function to get the variable names stored in the class instance.
+     * 
+     * @return std::vector<std::string> 
+     */
+    std::vector<std::string> GetVarNames() const;
+
     private:
         std::ofstream file_;
+        std::vector<std::string> varnames_;   
 };
 #endif // MATLAB_EXPORT_H
