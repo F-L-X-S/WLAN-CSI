@@ -97,9 +97,9 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     double usrp_rx_rate = ADC_RATE / (float)decim_rate;
 
     // ---------------------- Signal Generation in complex baseband ----------------------
-    unsigned int M           = 64;      // number of subcarriers 
-    unsigned int cp_len      = 16;      // cyclic prefix length (800ns for 20MHz => 16 Sample)
-    unsigned int taper_len   = 4;       // window taper length 
+    unsigned int M           = 32;      // number of subcarriers 
+    unsigned int cp_len      = 8 ;      // cyclic prefix length (800ns for 20MHz => 16 Sample)
+    unsigned int taper_len   = 2;       // window taper length 
     unsigned char p[M];                 // subcarrier allocation array
 
     unsigned int frame_len   = M + cp_len;
@@ -117,7 +117,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     // create frame generator
     ofdmframegen fg = ofdmframegen_create(M, cp_len, taper_len, p);
 
-    std::complex<float> tx_base[frame_samples];                  // complex baseband signal buffer
+    std::vector<std::complex<float>> tx_base(frame_samples);     // complex baseband signal buffer
     std::vector<std::complex<float>> X(M);                       // channelized symbols
     unsigned int n=0;                                            // Sample number in time domains
 
