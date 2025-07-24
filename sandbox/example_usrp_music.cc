@@ -222,7 +222,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
         std::ref(cfr_queue), std::ref(cbdata_queue),std::ref(stop_signal_called));
     
     std::thread t4(cfr_export_worker<NUM_CHANNELS>, std::ref(cfr_queue), 
-        double(0.05), std::ref(sender), std::ref(m_file_cfr), std::ref(stop_signal_called));
+        double(0.25), std::ref(sender), std::ref(m_file_cfr), std::ref(stop_signal_called));
     
     std::thread t5(cbdata_export_worker, std::ref(cbdata_queue), std::ref(m_file_cbdata), std::ref(stop_signal_called));
 
@@ -245,9 +245,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     resamp_crcf_destroy(resamp_tx);
 
     // Transmission thread 
-    std::thread t6(tx_worker, std::ref(tx_stream_0), std::ref(tx_data), 500, std::ref(stop_signal_called));
-
-
+    std::thread t6(tx_worker, std::ref(tx_stream_0), std::ref(tx_data), 250, std::ref(stop_signal_called));
 
     // ---------------------- Continue in main thread ----------------------
     std::this_thread::sleep_for(std::chrono::milliseconds(20000));
