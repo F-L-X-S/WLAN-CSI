@@ -254,7 +254,10 @@ void sync_worker(   std::array<resamp_crcf, num_channels>& resamplers,
                             resamp_crcf_execute(    resamplers[i], 
                                                     sample_blocks[j].samples[k],
                                                     &rx_sample[0], &num_written);  
-                                
+                            
+                            // Sample already synchronized, Skip synchronization 
+                            if (num_written==0) continue;
+
                             // Execute Synchronizer for channel i 
                             ms.Execute(i, &rx_sample);          
                                 
