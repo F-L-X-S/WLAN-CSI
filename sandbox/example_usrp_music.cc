@@ -155,24 +155,10 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     std::vector<std::complex<float>> tx_base_interp(2*n);
     for (unsigned int j=0; j<n; j++)
         resamp2_crcf_interp_execute(interp, tx_base[j], &tx_base_interp[2*j]);
+    resamp2_crcf_destroy(interp);
 
-    // TX Arbitrary Resampler 
-    // TODO: Get actual usrp tx rate and overwrite usrp_tx_rate
-    double tx_resamp_rate = usrp_tx_rate / txrx_rate;
-    std::cout << boost::format("TX Resampling Rate (usrp-rate/tx-rate): %f ") % (tx_resamp_rate) << std::endl;
 
-    unsigned int nw, tx_len = (unsigned int)(frame_samples*ceil(tx_resamp_rate)*2);
-    std::vector<std::complex<float>> tx_data(tx_len);
-    resamp_crcf resamp_tx = resamp_crcf_create(tx_resamp_rate,7,0.4f,60.0f,64);
-    resamp_crcf_set_rate(resamp_tx, tx_resamp_rate);
-    n=0;
-    for (unsigned int j=0; j<tx_base_interp.size(); j++) {
-        resamp_crcf_execute(resamp_tx, tx_base_interp[j], &tx_data[n], &nw);
-        n += nw;
-    };
-    resamp_crcf_destroy(resamp_tx);
-
-   // ---------------------- Receiver settings ----------------------
+   // ---------------------- Configure USRPs ----------------------
     //create USRP devices
     std::array<uhd::usrp::multi_usrp::sptr, 2> usrps {
         uhd::usrp::multi_usrp::make("addr=192.168.10.3"), 
@@ -186,11 +172,18 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     uhd::rx_streamer::sptr rx_stream_1 = usrps[1]->get_rx_stream(stream_args);                // cretae a receive stream 
     size_t max_samps = rx_stream_0->get_max_num_samps();  
 
+    // Start streaming
+    std::thread t0(stream_worker<NUM_CHANNELS>, std::ref(usrps), 
+        std::ref(max_samps), std::ref(usrp_tx_rate), std::ref(usrp_rx_rate), std::ref(center_freq), 
+        std::ref(stop_signal_called));
+    std::this_thread::sleep_for(std::chrono::milliseconds(3000));
+
+    // ---------------------- Configure Receive workers ----------------------
     // TX stream configuration 
     uhd::tx_streamer::sptr tx_stream_0 = usrps[0]->get_tx_stream(stream_args); 
 
     // RX Resampling rate = baseband-bw/rx-bandwidth
-    // TODO: Get actual usrp rx rate and overwrite usrp_rx_rate
+    usrp_rx_rate = usrps[0]->get_rx_rate(0);
     double rx_resamp_rate = txrx_rate / usrp_rx_rate;
     std::cout << boost::format("RX Resampling Rate (usrp-rate/rx-rate): %f ") % (rx_resamp_rate) << std::endl;
 
@@ -214,17 +207,14 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
 
     // Thread-safe queues 
     std::array<RxSamplesQueue_t, 2> rx_queues;
-    CfrQueue_t cfr_queue;
-    CbDataQueue_t cbdata_queue;
-
-    // Start receiving...
-    std::thread t0(stream_worker<NUM_CHANNELS>, std::ref(usrps), 
-        std::ref(max_samps), std::ref(usrp_tx_rate), std::ref(usrp_rx_rate), std::ref(center_freq), 
-        std::ref(stop_signal_called));
-    std::this_thread::sleep_for(std::chrono::milliseconds(3000));
 
     std::thread t1(rx_worker<4096>, rx_stream_0, std::ref(rx_queues[0]), std::ref(stop_signal_called));
     std::thread t2(rx_worker<4096>, rx_stream_1, std::ref(rx_queues[1]), std::ref(stop_signal_called));
+
+    // ---------------------- Configure Export workers ----------------------
+    // Thread-safe queues 
+    CfrQueue_t cfr_queue;
+    CbDataQueue_t cbdata_queue;
 
     std::thread t3(sync_worker<NUM_CHANNELS, Sync_t, CallbackData_t>, 
         std::ref(resamplers), std::ref(ms), 
@@ -236,10 +226,30 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     
     std::thread t5(cbdata_export_worker, std::ref(cbdata_queue), std::ref(m_file_cbdata), std::ref(stop_signal_called));
 
-    // Start Sending...
+    // ---------------------- Configure Transmit workers ----------------------
+
+    // TX Arbitrary Resampler 
+    usrp_tx_rate = usrps[0]->get_tx_rate(0);
+    double tx_resamp_rate = usrp_tx_rate / txrx_rate;
+    std::cout << boost::format("TX Resampling Rate (usrp-rate/tx-rate): %f ") % (tx_resamp_rate) << std::endl;
+
+    unsigned int nw, tx_len = (unsigned int)(frame_samples*ceil(tx_resamp_rate)*2);
+    std::vector<std::complex<float>> tx_data(tx_len);
+    resamp_crcf resamp_tx = resamp_crcf_create(tx_resamp_rate,7,0.4f,60.0f,64);
+    resamp_crcf_set_rate(resamp_tx, tx_resamp_rate);
+    n=0;
+    for (unsigned int j=0; j<tx_base_interp.size(); j++) {
+        resamp_crcf_execute(resamp_tx, tx_base_interp[j], &tx_data[n], &nw);
+        n += nw;
+    };
+    resamp_crcf_destroy(resamp_tx);
+
+    // Transmission thread 
     std::thread t6(tx_worker, std::ref(tx_stream_0), std::ref(tx_data), 500, std::ref(stop_signal_called));
 
-    // Wait for stop signal...
+
+
+    // ---------------------- Continue in main thread ----------------------
     std::this_thread::sleep_for(std::chrono::milliseconds(20000));
     stop_signal_called.store(true);
 
