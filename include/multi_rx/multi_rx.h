@@ -292,7 +292,7 @@ void sync_worker(   std::array<resamp_crcf, num_channels>& resamplers,
 
 
         // Synchronize NCOs of all channels to the average NCO frequency and phase
-        ms.SynchronizeNcos();
+        //ms.SynchronizeNcos();
     }
 }
 
