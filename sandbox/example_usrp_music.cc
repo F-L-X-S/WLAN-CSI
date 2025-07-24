@@ -97,8 +97,8 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     double usrp_rx_rate = ADC_RATE / (float)decim_rate;
 
     // ---------------------- Signal Generation in complex baseband ----------------------
-    unsigned int M           = 32;      // number of subcarriers 
-    unsigned int cp_len      = 8;      // cyclic prefix length (800ns for 20MHz => 16 Sample)
+    unsigned int M           = 64;      // number of subcarriers 
+    unsigned int cp_len      = 16;      // cyclic prefix length (800ns for 20MHz => 16 Sample)
     unsigned int taper_len   = 4;       // window taper length 
     unsigned char p[M];                 // subcarrier allocation array
 
@@ -153,7 +153,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     // TX half band resampler -> interpolation by 2 
     resamp2_crcf interp = resamp2_crcf_create(7,0.0f,40.0f);
     std::vector<std::complex<float>> tx_base_interp(2*n);
-    for (unsigned int j=0; j<80; j++)
+    for (unsigned int j=0; j<n; j++)
         resamp2_crcf_interp_execute(interp, tx_base[j], &tx_base_interp[2*j]);
 
     // TX Arbitrary Resampler 
@@ -180,7 +180,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     };
 
     // Receive stream confguration
-    uhd::stream_args_t stream_args("fc32");                                                 // convert internal sc16 to complex float 32
+    uhd::stream_args_t stream_args("fc32");                                                   // convert internal sc16 to complex float 32
     stream_args.args["recv_buff_size"] = "100000000"; // 100MB Buffer
     uhd::rx_streamer::sptr rx_stream_0 = usrps[0]->get_rx_stream(stream_args);                // create receive streams 
     uhd::rx_streamer::sptr rx_stream_1 = usrps[1]->get_rx_stream(stream_args);                // cretae a receive stream 
