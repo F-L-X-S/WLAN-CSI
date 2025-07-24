@@ -81,6 +81,7 @@ void stream_worker( std::array<uhd::usrp::multi_usrp::sptr, num_channels>& usrps
                     double& tx_rate,
                     double& rx_rate,
                     double& center_freq,
+                    unsigned int cycle_time,
                     std::atomic<bool>& stop_signal_called) {
 
 
@@ -109,7 +110,7 @@ void stream_worker( std::array<uhd::usrp::multi_usrp::sptr, num_channels>& usrps
         usrp->set_tx_rate(tx_rate, uhd::usrp::multi_usrp::ALL_MBOARDS);       // set TX sample rate
         usrp->set_rx_freq(tune_request, 0);                                     // set RX Frequency  
         usrp->set_tx_freq(tune_request, 0);                                     // set TX Frequency  
-        usrp->set_rx_gain(20, 0);                                               // set the RX gain
+        usrp->set_rx_gain(30, 0);                                               // set the RX gain
         usrp->set_tx_gain(10, 0);                                               // set the TX gain
         usrp->set_rx_antenna("RX2", 0);                                         // set the RX antenna
         usrp->set_tx_antenna("TX/RX", 0);                                       // set the TX antenna
@@ -142,17 +143,24 @@ void stream_worker( std::array<uhd::usrp::multi_usrp::sptr, num_channels>& usrps
     uhd::stream_cmd_t stream_cmd(uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS);
     stream_cmd.num_samps = max_samps; // number of samples to receive per frame
     stream_cmd.stream_now = false;  
-    double seconds_in_future = 0.5; 
+    double seconds_in_future = 0.1; 
 
-    for (auto usrp : usrps){
+    // Cyclic burst stream
+    while (!stop_signal_called.load()) {
+            for (auto usrp : usrps){
             // Set the time spec to start receiving in the future
             stream_cmd.time_spec = usrp->get_time_now() + uhd::time_spec_t(seconds_in_future);  
             // Start USRPs streaming
             usrp->issue_stream_cmd(stream_cmd); 
-    };
+            };
 
-    // Cyclic burst stream
-    while (!stop_signal_called.load()) {
+            // receive for cycle time 
+            boost::this_thread::sleep(boost::posix_time::milliseconds(cycle_time));
+
+            // Stop streaming 
+            for (auto usrp : usrps){
+                usrp->issue_stream_cmd(uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS);
+            }
 
     };
 

@@ -175,7 +175,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     // Start streaming
     std::thread t0(stream_worker<NUM_CHANNELS>, std::ref(usrps), 
         std::ref(max_samps), std::ref(usrp_tx_rate), std::ref(usrp_rx_rate), std::ref(center_freq), 
-        std::ref(stop_signal_called));
+        double(750) ,std::ref(stop_signal_called));
     std::this_thread::sleep_for(std::chrono::milliseconds(3000));
 
     // ---------------------- Configure Receive workers ----------------------
