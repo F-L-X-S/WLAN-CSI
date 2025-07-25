@@ -98,6 +98,12 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     decim_rate = (decim_rate >> 1) << 1;        // ensure multiple of 2
     double usrp_rx_rate = ADC_RATE / (float)decim_rate;
 
+    // Resampling / Filter settings 
+    unsigned int filter_semi_len = 8;
+    float filter_cutoff_freq = 0.25;
+    float filter_stop_band_att = 80.0;
+    unsigned int num_filter_banks = 32;
+
     // ---------------------- Signal Generation in complex baseband ----------------------
     unsigned int M           = 32;      // number of subcarriers 
     unsigned int cp_len      = 8 ;      // cyclic prefix length (800ns for 20MHz => 16 Sample)
@@ -153,7 +159,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     }
 
     // TX half band resampler -> interpolation by 2 
-    resamp2_crcf interp = resamp2_crcf_create(7,0.0f,40.0f);
+    resamp2_crcf interp = resamp2_crcf_create(filter_semi_len,0.0f,filter_stop_band_att);
     std::vector<std::complex<float>> tx_base_interp(2*n);
     for (unsigned int j=0; j<n; j++)
         resamp2_crcf_interp_execute(interp, tx_base[j], &tx_base_interp[2*j]);
@@ -191,8 +197,8 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
 
     // RX Resamplers
     std::array<resamp_crcf, 2> resamplers = {
-        resamp_crcf_create(0.5*rx_resamp_rate,7,0.4f,60.0f,64),
-        resamp_crcf_create(0.5*rx_resamp_rate,7,0.4f,60.0f,64)
+        resamp_crcf_create(0.5*rx_resamp_rate,filter_semi_len,filter_cutoff_freq,filter_stop_band_att,num_filter_banks),
+        resamp_crcf_create(0.5*rx_resamp_rate,filter_semi_len,filter_cutoff_freq,filter_stop_band_att,num_filter_banks)
     };
 
     // callback data
@@ -237,7 +243,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
 
     unsigned int nw, tx_len = (unsigned int)(frame_samples*ceil(tx_resamp_rate)*2);
     std::vector<std::complex<float>> tx_data(tx_len);
-    resamp_crcf resamp_tx = resamp_crcf_create(tx_resamp_rate,7,0.4f,60.0f,64);
+    resamp_crcf resamp_tx = resamp_crcf_create(tx_resamp_rate,filter_semi_len,filter_cutoff_freq,filter_stop_band_att,num_filter_banks);
     resamp_crcf_set_rate(resamp_tx, tx_resamp_rate);
     n=0;
     for (unsigned int j=0; j<tx_base_interp.size(); j++) {
