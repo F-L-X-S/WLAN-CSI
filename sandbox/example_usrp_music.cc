@@ -191,8 +191,8 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
 
     // RX Resamplers
     std::array<resamp_crcf, 2> resamplers = {
-        resamp_crcf_create_default(0.5*rx_resamp_rate),
-        resamp_crcf_create_default(0.5*rx_resamp_rate)
+        resamp_crcf_create(0.5*rx_resamp_rate,7,0.4f,60.0f,64),
+        resamp_crcf_create(0.5*rx_resamp_rate,7,0.4f,60.0f,64)
     };
 
     // callback data
