@@ -78,7 +78,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     unsigned long int ADC_RATE = 100e6;             // USRP ADC Rate (N210 fixed to 100MHz)
 
     // TX/RX Settings 
-    double bandwidth = 4e6f;                        // Bandwidth 
+    double bandwidth = 3e6f;                        // Bandwidth 
     double center_freq = 433.55e6;                  // Carrier frequency in free band 
     double txrx_rate = 4*bandwidth;                 // Sample rate  
     unsigned int tx_cycle = 250;                    // Transmit every ... [ms]
