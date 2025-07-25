@@ -74,13 +74,15 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     MatlabExport m_file_cbdata(OUTFILE_CBDATA);
 
     // USRP Constants
-    unsigned long int DAC_RATE = 400e6;     // USRP DAC Rate (N210 fixed to 400MHz)
-    unsigned long int ADC_RATE = 100e6;     // USRP ADC Rate (N210 fixed to 100MHz)
+    unsigned long int DAC_RATE = 400e6;             // USRP DAC Rate (N210 fixed to 400MHz)
+    unsigned long int ADC_RATE = 100e6;             // USRP ADC Rate (N210 fixed to 100MHz)
 
     // TX/RX Settings 
-    double bandwidth = 4e6f;                // Bandwidth 
-    double center_freq = 433.55e6;          // Carrier frequency in free band 
-    double txrx_rate = 4*bandwidth;         // Sample rate  
+    double bandwidth = 4e6f;                        // Bandwidth 
+    double center_freq = 433.55e6;                  // Carrier frequency in free band 
+    double txrx_rate = 4*bandwidth;                 // Sample rate  
+    unsigned int tx_cycle = 250;                    // Transmit every ... [ms]
+    double max_age = 0.45*(double)tx_cycle/1000;    // max time delta between CFRs to group together [s]
 
     // TX 
     // NOTE : the sample rate computation MUST be in double precision so
@@ -222,7 +224,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
         std::ref(cfr_queue), std::ref(cbdata_queue),std::ref(stop_signal_called));
     
     std::thread t4(cfr_export_worker<NUM_CHANNELS>, std::ref(cfr_queue), 
-        double(0.25), std::ref(sender), std::ref(m_file_cfr), std::ref(stop_signal_called));
+        max_age, std::ref(sender), std::ref(m_file_cfr), std::ref(stop_signal_called));
     
     std::thread t5(cbdata_export_worker, std::ref(cbdata_queue), std::ref(m_file_cbdata), std::ref(stop_signal_called));
 
@@ -245,7 +247,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     resamp_crcf_destroy(resamp_tx);
 
     // Transmission thread 
-    std::thread t6(tx_worker, std::ref(tx_stream_0), std::ref(tx_data), 250, std::ref(stop_signal_called));
+    std::thread t6(tx_worker, std::ref(tx_stream_0), std::ref(tx_data), tx_cycle, std::ref(stop_signal_called));
 
     // ---------------------- Continue in main thread ----------------------
     std::this_thread::sleep_for(std::chrono::milliseconds(60000));
