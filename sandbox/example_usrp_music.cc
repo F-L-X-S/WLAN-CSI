@@ -189,7 +189,6 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
         userdata[i] = &cb_data[i];
         
     // Create multi frame synchronizer
-    ofdmframe_init_default_sctype(M, p);
     Sync_t ms(NUM_CHANNELS, {M, cp_len, taper_len, p}, callback, userdata);
 
     // Thread-safe queues 
