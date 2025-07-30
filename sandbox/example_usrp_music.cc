@@ -31,7 +31,7 @@
 #include <zmq_socket/zmq_socket.h>
 
 #define NUM_CHANNELS 2                                          // Number of Channels (USRP-devices)   
-#define SYMBOLS_PER_FRAME 3                                     // Number of Symbols to send per frame 
+#define SYMBOLS_PER_FRAME 1                                     // Number of Symbols to send per frame 
 #define OUTFILE_CFR "./matlab/example_usrp_music/cfr.m"         // Output file in MATLAB-format to store results
 #define OUTFILE_CBDATA "./matlab/example_usrp_music/cbdata.m"   // Output file in MATLAB-format to store results
 #define EXPORT_INTERFACE 'tcp://localhost:5555'                 // Interface for zmq socket
