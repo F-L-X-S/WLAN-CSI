@@ -27,34 +27,46 @@ ANTENNAS_PER_ROW = 2
 
 class MusicSpectrum(PyQt6.QtWidgets.QApplication):
 	def pollSocket(self):
-		msg = None
-		# Drain the socket: keep only the latest message
+     	# Drain the socket: collect all messages 
+		messages = []
 		while True:
 			try:
 				msg = self.socket.recv(zmq.NOBLOCK)
+				messages.append(msg)
 			except zmq.Again:
 				break  # No more messages available
 
-		if msg is not None:			
-			# Header: 3 x uint32 → 12 bytes
-			n_measurements, num_channels, samples_per_channel = struct.unpack("III", msg[:12])
+		#process messages 
+		all_data = []
+		for msg in messages:
+				# Header: 3 x uint32 → 12 bytes
+				n_measurements, num_channels, samples_per_channel = struct.unpack("III", msg[:12])
+				
+    			# Load Data (complex values)
+				data = np.frombuffer(msg[12:], dtype=np.complex64)
+    
+				# Transform to  (num_channels, samples_per_channel) 
+				try:
+					reshaped = data.reshape((n_measurements, num_channels, samples_per_channel))
+				except ValueError:
+					return  # skip invalid reshape
+ 
+				all_data.append(reshaped)  
+  
 
-         	# Load Data (complex values)
-			data = np.frombuffer(msg[12:], dtype=np.complex64)
+		if not all_data:
+			return
+      
+		# stack along n_measurements axis
+		stacked = np.concatenate(all_data, axis=0)
+      
+		# shape : (size, n_arrays, n_rows, n_antennas, subcarriers)
+		self.csi = stacked[:, np.newaxis, np.newaxis, :, :]
    
-			# Transform to  (num_channels, samples_per_channel) 
-			try:
-				reshaped = data.reshape((n_measurements, num_channels, samples_per_channel))
-			except ValueError:
-				return  # skip invalid reshape
-
-    		# shape : (size, n_arrays, n_rows, n_antennas, subcarriers)
-			self.csi = reshaped[:, np.newaxis, np.newaxis, :, :]
-   
-			# modify steering vectors
-			if num_channels != self.antennas_per_row:
-				self.antennas_per_row = num_channels
-				self.steering_vectors = np.exp(-1.0j * np.outer(np.pi * np.sin(self.scanning_angles), np.arange(self.antennas_per_row)))
+		# modify steering vectors
+		if num_channels != self.antennas_per_row:
+			self.antennas_per_row = num_channels
+			self.steering_vectors = np.exp(-1.0j * np.outer(np.pi * np.sin(self.scanning_angles), np.arange(self.antennas_per_row)))
 
 		
 	def __init__(self, argv):
