@@ -1,7 +1,24 @@
 /**
  * @file example_usrp_music.cc
  * @author Felix Schuelke 
- * @brief USRP integartion based on Ettus example project https://kb.ettus.com/Getting_Started_with_UHD_and_C%2B%2B
+ * @brief This example demonstrates the DoA Estimation of an OFDM transmitter using NUM_CHANNELS lambda-half spaced antennas. 
+ * 
+ * 1. A complex OFDM Signal is generated and transmitted by the tx-worker
+ * 2. The received samples of each channel are processed by separated rx-worker, which forward the received samples to the sync-worker
+ * 3. The queued samples of each rx-channel are synchronized by a independent ofdm-synchronizer within the sync-worker. The synchronization is 
+ *    possible for other modulation types by manipulating the MultiSync-class. 
+ *      -> Detected data-symbols are forwarded as queued callback-data to the cbdata_export_worker, which exports them to the specified MATLAB-file
+ *      -> The Channel Frequency Responses (CFRs) of detected frames are forwarded to the cfr_export_worker
+ * 4. The cfr_export_worker writes the CFRs to the specified MATLAB file and forwards them via a ZMQ-socket to the music-spectrum.py
+ *      -> The spatial MUSIC-spectrum is calculated by music-spectrum.py
+ * 
+ * The configuration of the USRP-hardware is performed by the stream-worker. 
+ * All workers are defined in multi_rx.h 
+ * 
+ * Ettus example project for USRP integartion: https://kb.ettus.com/Getting_Started_with_UHD_and_C%2B%2B
+ * Liquid-DSP documentation: https://liquidsdr.org
+ * Liquid-DSP project: https://github.com/jgaeddert/liquid-dsp
+ * 
  * @version 0.1
  * @date 2025-07-01
  * 
