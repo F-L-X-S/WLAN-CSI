@@ -110,7 +110,7 @@ void stream_worker( std::array<uhd::usrp::multi_usrp::sptr, num_channels>& usrps
         usrp->set_tx_rate(tx_rate, uhd::usrp::multi_usrp::ALL_MBOARDS);       // set TX sample rate
         usrp->set_rx_freq(tune_request, 0);                                     // set RX Frequency  
         usrp->set_tx_freq(tune_request, 0);                                     // set TX Frequency  
-        usrp->set_rx_gain(10, 0);                                               // set the RX gain
+        usrp->set_rx_gain(20, 0);                                               // set the RX gain
         usrp->set_tx_gain(15, 0);                                               // set the TX gain
         usrp->set_rx_antenna("RX2", 0);                                         // set the RX antenna
         usrp->set_tx_antenna("TX/RX", 0);                                       // set the TX antenna
