@@ -37,6 +37,7 @@
 #include <boost/thread.hpp>
 #include <iostream>
 #include <csignal>
+#include <cstdlib>
 #include <atomic>
 #include <queue>
 #include <mutex>
@@ -51,6 +52,9 @@
 #define SYMBOLS_PER_FRAME 1                                     // Number of Symbols to send per frame 
 #define OUTFILE_CFR "./matlab/example_usrp_music/cfr.m"         // Output file in MATLAB-format to store results
 #define OUTFILE_CBDATA "./matlab/example_usrp_music/cbdata.m"   // Output file in MATLAB-format to store results
+
+#define PYTHONPATH "./music/env/bin/python"
+#define MUSIC_PYFILE "./music/music-spectrum.py"                // Python script with MUSIC algorithm for DoA estimation
 #define EXPORT_INTERFACE 'tcp://localhost:5555'                 // Interface for zmq socket
 
 // Use OFDM-frame synchronizer for multi-channel synchronization
@@ -85,6 +89,10 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
 
     // ZMQ socket for data export 
     ZmqSender sender("tcp://*:5555");
+
+    // Run spectral MUSIC DoA algorithm
+    std::string cmd = std::string(PYTHONPATH) + ' ' + std::string(MUSIC_PYFILE)+"&";
+    system(cmd.c_str());
 
     // Matlab Export destination file
     MatlabExport m_file_cfr(OUTFILE_CFR);
