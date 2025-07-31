@@ -85,12 +85,14 @@ add_executable(${PROJECT_NAME} ${MAIN_SRC_FILES})
 # link libraries to executable
 target_link_libraries(
   ${PROJECT_NAME} 
-  power_trigger_lib
-  auto_corr_lib
-  liquid
-  zmq_socket
-  ${UHD_LIBRARIES}
-  ${Boost_LIBRARIES}
+    power_trigger_lib
+    auto_corr_lib
+    signal_generator_lib
+    matlab_export_lib
+    liquid
+    zmq_socket
+    ${UHD_LIBRARIES}
+    ${Boost_LIBRARIES}
   )
 
 # ---------- Sandbox ----------------
