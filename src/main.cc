@@ -50,8 +50,8 @@
 
 #define NUM_CHANNELS 2                                          // Number of Channels (USRP-devices)   
 #define SYMBOLS_PER_FRAME 1                                     // Number of Symbols to send per frame 
-#define OUTFILE_CFR "./matlab/usrp_music_125MHz_M256_1m_0deg/cfr.m"         // Output file in MATLAB-format to store results
-#define OUTFILE_CBDATA "./matlab/usrp_music_125MHz_M256_1m_0deg/cbdata.m"   // Output file in MATLAB-format to store results
+#define OUTFILE_CFR "./matlab/music_125MHz_M256_1m_0deg/cfr.m"         // Output file in MATLAB-format to store results
+#define OUTFILE_CBDATA "./matlab/music_125MHz_M256_1m_0deg/cbdata.m"   // Output file in MATLAB-format to store results
 
 #define PYTHONPATH "./music/env/bin/python"
 #define MUSIC_PYFILE "./music/music-spectrum.py"                // Python script with MUSIC algorithm for DoA estimation
@@ -105,7 +105,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     // TX/RX Settings 
     double center_freq = 1.25e9;                    // Carrier frequency 
     double txrx_rate = 3.84e6;                      // Sample rate  
-    unsigned int tx_cycle = 100;                    // Transmit every ... [ms]
+    unsigned int tx_cycle = 1500;                    // Transmit every ... [ms]
     double max_age = 0.45*(double)tx_cycle/1000;    // max time delta between CFRs to group together [s]
 
     // TX 
