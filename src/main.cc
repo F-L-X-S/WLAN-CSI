@@ -50,8 +50,8 @@
 
 #define NUM_CHANNELS 2                                          // Number of Channels (USRP-devices)   
 #define SYMBOLS_PER_FRAME 1                                     // Number of Symbols to send per frame 
-#define OUTFILE_CFR "./matlab/music_125MHz_M256_1m_0deg/cfr.m"         // Output file in MATLAB-format to store results
-#define OUTFILE_CBDATA "./matlab/music_125MHz_M256_1m_0deg/cbdata.m"   // Output file in MATLAB-format to store results
+#define OUTFILE_CFR "./matlab/music_125MHz_M256_1m_45deg/cfr.m"         // Output file in MATLAB-format to store results
+#define OUTFILE_CBDATA "./matlab/music_125MHz_M256_1m_45deg/cbdata.m"   // Output file in MATLAB-format to store results
 
 #define PYTHONPATH "./music/env/bin/python"
 #define MUSIC_PYFILE "./music/music-spectrum.py"                // Python script with MUSIC algorithm for DoA estimation
@@ -134,12 +134,6 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     // initialize subcarrier allocation
     ofdmframe_init_default_sctype(M, p);
 
-    // create subcarrier notch in upper half of band
-    unsigned int n0 = (unsigned int) (0.13 * M);    // lower edge of notch
-    unsigned int n1 = (unsigned int) (0.21 * M);    // upper edge of notch
-    for (size_t i=n0; i<n1; i++)
-        p[i] = OFDMFRAME_SCTYPE_NULL;
-
     // create frame generator
     ofdmframegen fg = ofdmframegen_create(M, cp_len, taper_len, p);
 
@@ -194,7 +188,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     std::thread t0(stream_worker<NUM_CHANNELS>, std::ref(usrps), 
         std::ref(max_samps), std::ref(usrp_tx_rate), std::ref(usrp_rx_rate), std::ref(center_freq), 
         double(750) ,std::ref(stop_signal_called));
-    std::this_thread::sleep_for(std::chrono::milliseconds(3000));
+    std::this_thread::sleep_for(std::chrono::milliseconds(3*tx_cycle));
 
     // ---------------------- Configure Receive workers ----------------------
     // TX stream configuration 
@@ -247,7 +241,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     std::thread t6(tx_worker, std::ref(tx_stream_0), std::ref(tx_base), tx_cycle, std::ref(stop_signal_called));
 
     // ---------------------- Continue in main thread ----------------------
-    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    std::this_thread::sleep_for(std::chrono::milliseconds(tx_cycle));
     stop_signal_called.store(true);
 
     rx_queues[0].cv.notify_all();

@@ -94,8 +94,8 @@ void stream_worker( std::array<uhd::usrp::multi_usrp::sptr, num_channels>& usrps
         if (i==0) usrps[i]->set_time_now(uhd::time_spec_t(0.0), 0);     // initialize device time
     };
 
-    //sleep a bit while the slaves lock its time to the master
-    boost::this_thread::sleep(boost::posix_time::milliseconds(100));
+    //sleep a while the slaves lock its time to the master
+    boost::this_thread::sleep(boost::posix_time::milliseconds(cycle_time));
 
     // Configure tune request for desired center frequency 
     uhd::tune_request_t tune_request(center_freq); 
@@ -115,6 +115,9 @@ void stream_worker( std::array<uhd::usrp::multi_usrp::sptr, num_channels>& usrps
         usrp->set_rx_antenna("RX2", 0);                                         // set the RX antenna
         usrp->set_tx_antenna("TX/RX", 0);                                       // set the TX antenna
     }
+
+    //sleep a while...
+    boost::this_thread::sleep(boost::posix_time::milliseconds(cycle_time));
 
     // Print device configuration 
     for (i=0; i < num_channels; ++i){
@@ -155,7 +158,7 @@ void stream_worker( std::array<uhd::usrp::multi_usrp::sptr, num_channels>& usrps
             };
 
             // receive for cycle time 
-            boost::this_thread::sleep(boost::posix_time::milliseconds(cycle_time));
+            boost::this_thread::sleep(boost::posix_time::milliseconds(10*cycle_time));
 
             // Stop streaming 
             for (auto usrp : usrps){
