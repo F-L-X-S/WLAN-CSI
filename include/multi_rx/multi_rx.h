@@ -76,7 +76,7 @@ struct CbDataQueue_t
 
 struct Phase_t {
     float phi;               // Phase data
-    unsigned int channel;                               // Channel index
+    unsigned int channel;    // Channel index
 };
 
 struct PhaseQueue_t
