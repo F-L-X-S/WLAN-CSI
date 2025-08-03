@@ -17,6 +17,7 @@
 #define MULTISYNC_H
 
 #include <complex>
+#include <cmath>
 #include <cassert>
 #include <liquid.h>
 
@@ -72,10 +73,6 @@ struct SyncTraits<ofdmframesync> {
         X->resize(fft_size);
         ofdmframesync_get_cfr(fs, X->data(), fft_size);
     }
-
-    static nco_crcf* GetNco(ofdmframesync_s* fs){
-        return ofdmframesync_get_nco(fs);
-    }
 };
 
 /**
@@ -103,7 +100,7 @@ public:
      * @param _userdata user-defined data structure array
      * @param _callback user-defined callback function
      */
-MultiSync(  unsigned int             num_channels,
+    MultiSync(unsigned int             num_channels,
             const ParamsType&        synchronizer_params, 
             CallbackType             callback,
             void **                  userdata):
@@ -111,9 +108,11 @@ MultiSync(  unsigned int             num_channels,
             {
                 // create frame synchronizers
                 framesync_ = new synchronizer_type[num_channels_];
+                nco_ = new nco_crcf[num_channels_];
                 for (unsigned int i=0; i<num_channels; i++) {
                     userdata_[i]  = userdata[i];
                     framesync_[i] = SyncTraits<synchronizer_type>::Create(synchronizer_params, callback_, userdata_[i]);
+                    nco_[i] = nco_crcf_create(LIQUID_VCO);
                 }
             }
 
@@ -123,9 +122,12 @@ MultiSync(  unsigned int             num_channels,
      */
     ~MultiSync()
             {
-                for (unsigned int i = 0; i < num_channels_; i++)
+                for (unsigned int i = 0; i < num_channels_; i++){
                     SyncTraits<synchronizer_type>::Destroy(framesync_[i]);
+                    nco_crcf_destroy(nco_[i]);
+                }
                 delete[] framesync_;
+                delete[] nco_;
             }
 
     /**
@@ -145,61 +147,32 @@ MultiSync(  unsigned int             num_channels,
      * @param num_samples number of input samples to process
      */
     void Execute(unsigned int           channel_id,
-                std::vector<std::complex<float>>*   x)
-                {
+                std::vector<std::complex<float>>* x)
+                {   
+                    nco_crcf_mix_block_up(nco_[channel_id],x->data(), x->data(),x->size()); // Apply constant phase offset 
                     SyncTraits<synchronizer_type>::Execute(framesync_[channel_id], x->data(), x->size());
                 };
-    
+
     /**
-     * @brief  Synchronize NCOs of all channels to the average NCO frequency and phase
+     * @brief  Increments the internal nco phase by dphi
      * 
+     * @param channel_id channel id
      */
-    void SynchronizeNcos()
+    void AdjustNcoPhase(unsigned int channel_id, float dphi)
                 {
-                    // Initialize 
-                    nco_freq_ = 0.0f;
-                    nco_phase_ = 0.0f;
-
-                    // Synchronize NCOs
-                    for (unsigned int i = 0; i < num_channels_; ++i) {
-                        nco_crcf* nco = SyncTraits<synchronizer_type>::GetNco(framesync_[i]);
-                        nco_freq_ += nco_crcf_get_frequency(*nco);
-                        nco_phase_ += nco_crcf_get_phase(*nco);
-                    }
-
-                    // Average NCO frequency and phase
-                    nco_freq_ /= num_channels_;
-                    nco_phase_ /= num_channels_;
-
-                    // Set NCO frequency and phase for all channels
-                    for (unsigned int i = 0; i < num_channels_; ++i) {
-                        nco_crcf* nco = SyncTraits<synchronizer_type>::GetNco(framesync_[i]);
-                        nco_crcf_set_frequency(*nco, nco_freq_);
-                        nco_crcf_set_phase(*nco, nco_phase_);
-                    }
+                    // Adjust the NCO phase
+                    nco_crcf_adjust_phase(nco_[channel_id], dphi);
                 };
 
     /**
-     * @brief Synchronize NCOs of all channels to the master channel
+     * @brief  Get the internal nco phase
      * 
-     * @param channel_id Master channel id
+     * @param channel_id channel id
      */
-    void SynchronizeNcos(unsigned int channel_id)
+    float GetNcoPhase(unsigned int channel_id)
                 {
-                    // Initialize by master-channel
-                    nco_crcf* nco = SyncTraits<synchronizer_type>::GetNco(framesync_[channel_id]);
-                    nco_freq_ = nco_crcf_get_frequency(*nco);
-                    nco_phase_ = nco_crcf_get_phase(*nco);
-
-                    // Set NCO frequency and phase for all channels
-                    for (unsigned int i = 0; i < num_channels_; ++i) {
-                        // skip master channel
-                        if (i == channel_id) continue; 
-                        // set NCO frequency and phase
-                        nco = SyncTraits<synchronizer_type>::GetNco(framesync_[i]);
-                        nco_crcf_set_frequency(*nco, nco_freq_);
-                        nco_crcf_set_phase(*nco, nco_phase_);
-                    }
+                    // Get the NCO phase
+                    return nco_crcf_get_phase(nco_[channel_id]);
                 };
 
     /**
@@ -228,6 +201,13 @@ private:
      * 
      */
     synchronizer_type* framesync_; 
+
+    /**
+     * @brief array of pointers to NCOs
+     * 
+     */
+    nco_crcf* nco_; 
+
 
     /**
      * @brief Synchronizer parameters
