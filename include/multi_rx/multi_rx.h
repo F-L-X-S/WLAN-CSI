@@ -162,14 +162,15 @@ void stream_worker( std::array<uhd::usrp::multi_usrp::sptr, num_channels>& usrps
                 usrp->issue_stream_cmd(uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS);
             }
 
+            // stop for cycle time -> synchronization
+            boost::this_thread::sleep(boost::posix_time::milliseconds((unsigned int) (0.1*cycle_time)));
+
     };
 
     // Stop streaming 
     for (auto usrp : usrps){
         usrp->issue_stream_cmd(uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS);
     }
-    // stop for cycle time -> synchronization
-    boost::this_thread::sleep(boost::posix_time::milliseconds(cycle_time));
 
 }
 
