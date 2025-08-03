@@ -74,6 +74,18 @@ struct CbDataQueue_t
     std::condition_variable cv;
 };
 
+struct Phase_t {
+    float phi;               // Phase data
+    unsigned int channel;    // Channel index
+};
+
+struct PhaseQueue_t
+{
+    std::queue<Phase_t> queue;
+    std::mutex mtx;
+    std::condition_variable cv;
+};
+
 // Stream Worker starts USRP streams
 template <std::size_t num_channels>
 void stream_worker( std::array<uhd::usrp::multi_usrp::sptr, num_channels>& usrps,
@@ -229,6 +241,7 @@ void sync_worker(   syncronizer_type& ms,
                     std::array<RxSamplesQueue_t, num_channels>& rx_queues,
                     CfrQueue_t& cfr_queue,
                     CbDataQueue_t& cbdata_queue,
+                    PhaseQueue_t& phi_error_queue,
                     std::atomic<bool>& stop_signal_called
                 ) {
 
@@ -238,6 +251,21 @@ void sync_worker(   syncronizer_type& ms,
     unsigned int i, j, num_written;
 
     while (!stop_signal_called.load()) {
+        // Process Phase Error queue to adjust NCO phase for the channel
+        std::unique_lock<std::mutex> lock_phi(phi_error_queue.mtx);
+        phi_error_queue.cv.wait_for(lock_phi, std::chrono::milliseconds(100), [&]() {
+            return !phi_error_queue.queue.empty() || stop_signal_called.load();
+        });
+
+        while (!phi_error_queue.queue.empty()) {
+            Phase_t phi_error = std::move(phi_error_queue.queue.front());
+            std::cout<< "Adjusted NCO of CH"<< phi_error.channel<<" from"<< ms.GetNcoPhase(phi_error.channel)<<" rad";
+            ms.AdjustNcoPhase(phi_error.channel, phi_error.phi);  // Adjust NCO phase for the channel
+            std::cout<< "to "<< ms.GetNcoPhase(phi_error.channel)<<" rad!"<<std::endl;
+            phi_error_queue.queue.pop();
+        }
+        lock_phi.unlock();
+
         // Process channels
         for (i = 0; i < num_channels; ++i) {
                 // Clear samples and Callback-data
@@ -291,10 +319,6 @@ void sync_worker(   syncronizer_type& ms,
                         };
                     };
                 };
-
-
-        // Synchronize NCOs of all channels to Channel 0
-        //ms.SynchronizeNcos(0);
     }
 }
 
@@ -468,6 +492,45 @@ void cbdata_export_worker(  CbDataQueue_t& cbdata_queue,
 
     // Add the complete command string to MATLAB export
     m_file.Add(matlab_cmd.str());
+}
+
+// Terminal Worker waits for user input 
+void terminal_worker(    PhaseQueue_t& phi_error_queue,
+                        std::atomic<bool>& stop_signal_called) {
+    
+    while (!stop_signal_called.load()) {
+        // Read User Input 
+        std::string input;
+        std::getline(std::cin, input);
+
+        // Parse single token commands 
+        if (input == "exit" || input == "quit" || input == "q") {
+            stop_signal_called.store(true);
+            break;
+        }
+
+        // Parse multi token commands 
+        std::vector<std::string> tokens;
+        boost::split(tokens, input, boost::is_any_of(" "));
+
+        // Adjust NCO phase for a specific channel
+        if (tokens.size() == 3 && tokens[0] == "adjust_phase") {
+            // Set NCO phase for a specific channel
+            unsigned int channel_id = std::stoi(tokens[1]);
+                Phase_t phase_data;
+                phase_data.channel = channel_id;
+                phase_data.phi = static_cast<float>(std::stod(tokens[2]));
+                {
+                    std::lock_guard<std::mutex> lock_phi(phi_error_queue.mtx);
+                    phi_error_queue.queue.push(std::move(phase_data));
+                }
+                phi_error_queue.cv.notify_one();
+            
+        } else {
+            std::cerr << "Unknown command: " << input << std::endl;
+        }
+
+    }
 }
 
 

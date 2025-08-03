@@ -220,10 +220,12 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     // Thread-safe queues 
     CfrQueue_t cfr_queue;
     CbDataQueue_t cbdata_queue;
+    PhaseQueue_t phi_error_queue;
 
     std::thread t3(sync_worker<NUM_CHANNELS, Sync_t, CallbackData_t>, std::ref(ms), 
         std::ref(cb_data), std::ref(rx_queues), 
-        std::ref(cfr_queue), std::ref(cbdata_queue),std::ref(stop_signal_called));
+        std::ref(cfr_queue), std::ref(cbdata_queue),
+        std::ref(phi_error_queue), std::ref(stop_signal_called));
     
     std::thread t4(cfr_export_worker<NUM_CHANNELS>, std::ref(cfr_queue), 
         max_age, std::ref(sender), std::ref(m_file_cfr), std::ref(stop_signal_called));
@@ -240,9 +242,13 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     // Transmission thread 
     std::thread t6(tx_worker, std::ref(tx_stream_0), std::ref(tx_base), tx_cycle, std::ref(stop_signal_called));
 
+    // ---------------------- Configure Terminal workers ----------------------
+    std::thread t7(terminal_worker, std::ref(phi_error_queue), std::ref(stop_signal_called));
+
     // ---------------------- Continue in main thread ----------------------
-    std::this_thread::sleep_for(std::chrono::milliseconds(tx_cycle));
-    stop_signal_called.store(true);
+    while (!stop_signal_called.load()) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    }
 
     rx_queues[0].cv.notify_all();
     rx_queues[1].cv.notify_all();
@@ -256,6 +262,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]) {
     t4.join();
     t5.join();
     t6.join();
+    t7.join();
 
     std::cout << "Stopped receiving...\n" << std::endl;
 
