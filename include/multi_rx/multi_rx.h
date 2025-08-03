@@ -365,7 +365,7 @@ void cfr_export_worker( CfrQueue_t& cfr_queue,
                 std::cout << "Exported CFR at timestamps ";
                 for (const auto& cfr : group) {
                     std::string timestamp = std::to_string(cfr->timestamp.get_full_secs())+std::to_string(cfr->timestamp.get_tick_count(1000));
-                    std::cout << timestamp << " ";
+                    std::cout << "CH"<<cfr->channel<<": "<<timestamp << " ";
                     m_file.Add(cfr->cfr, "CH" + std::to_string(cfr->channel) +"_"+timestamp);
                 }
                 std::cout <<"!"<< std::endl;
