@@ -113,7 +113,8 @@ class MusicSpectrum(PyQt6.QtWidgets.QApplication):
 		if self.csi is None:
 			return
 
-		# compute the covariance matrix
+		# compute the covariance matrix (complex inner product between indices i and j (n_antennas axis))
+  		# R_ij = sum_d sum_b sum_r sum_s CSI[d,b,r,i,s] * conj( CSI[d,b,r,j,s] )
 		R = np.einsum("dbris,dbrjs->ij", self.csi, np.conj(self.csi))
   
 		# eigenvalue decomposition
