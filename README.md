@@ -8,11 +8,10 @@ This project aims to provide a flexible software architecture, to implement and 
 -  [MultiSync](include/multisync/README.md) for simultaneous processing of multiple generic frame synchronizers based on [Liquid-DSP](https://liquidsdr.org)
 - [multi_rx.h](include/multi_rx/multi_rx.h) for synchronized processing of multiple USRP RX streams in separated threads
 - [ZMQ TCP interface](include/zmq_socket/zmq_socket.h) for forwarding of synchronously detected CFRs to the python app running the DoA algorithm 
-- DoA estimation by spectral MUSIC (multiple signal classification) in python 
 - [MATLAB export](include/matlab_export/matlab_export.h) to generate .m files for plotting CFR and constellation diagrams (check [matlabXport](https://github.com/F-L-X-S/matlabXport))
-- [MUSIC Algorithm](music/music-spectrum.py) python app based on [pyespargos](https://github.com/ESPARGOS/pyespargos)
-- [Main Application](src/main.cc) to estimate the DoA of an OFDM transmitter 
- 
+- [MUSIC Algorithm](music/music-spectrum.py) (multiple signal classification) python app based on [pyespargos](https://github.com/ESPARGOS/pyespargos) 
+- [Main Application](src/main.cc) to estimate the DoA of an OFDM transmitter using USRPs connected via UHD
+
  [example projects](sandbox/) provided in ./sandbox demonstrate the usage of the provided modules. Note, that some may be deprecated. In this case, the [Main Application](src/main.cc) gives you a functioning example on how to employ the provided modules. 
  The [Measurements](matlab/) show the MUSIC pseudospectrum and provide the corresponding datasets of the CFR and the received data-symbols from real-world measurement using two USRP N210 with WBX daughterboard. 
 
