@@ -5,42 +5,16 @@
 This project aims to provide a flexible software architecture, to implement and test DoA methods for various RF communication protocols.
 
 ## Main Features
-- Synchronized processing of multiple USRP RX streams in separated threads
-- Frame detection and synchronization based on [Liquid-DSP](https://liquidsdr.org)
-
-- Forwarding of synchronously detected CFRs to the python implementation of the DoA algorithm via a [ZMQ](https://zeromq.org/languages/cplusplus/) socket
+-  [MultiSync](include/multisync/README.md) for simultaneous processing of multiple generic frame synchronizers based on [Liquid-DSP](https://liquidsdr.org)
+- [multi_rx.h](include/multi_rx/multi_rx.h) for synchronized processing of multiple USRP RX streams in separated threads
+- [ZMQ TCP interface](include/zmq_socket/zmq_socket.h) for forwarding of synchronously detected CFRs to the python app running the DoA algorithm 
 - DoA estimation by spectral MUSIC (multiple signal classification) in python 
-- MATLAB export to plot CFR and constellation diagrams
-
-## Channel Frequency Response and Channel State Information
-A received signal can be described as the convolution of the transmitted signal $s(t)$ and the channel-impulse-response (CIR) $h(t)$:
-<br>
-
-$$r(t)=s(t)\circledast h(t)$$ 
-
-<br>
-Therefore the channel-frequency-response (transfer-function of the channel) is defined as  [^1]:
-<br>
-
-$$H(\omega)=\frac{R(\omega)}{S(\omega)}$$
-
-<br>
-
-### Fundamentals of subspace based DoA Estimation
-...
-
-### Channel State Information in OFDM-systems
-Orthogonal frequency division multiplexing (OFDM) divides the allocated bandwidth into a number of subcarriers for transmitting data in parallel, but with a lower symbol-rate in each stream. Aim of this procedure is, to reduce the likelihood of symbol-interference within the seperated streams. The attenuation and phase of a single subcarrier represent a sample of the CFR at the center-frequency of the respective subcarrier:
-<br>
-
-$$H(f_k)=||H(f_k)||e^{\angle H(f_k)}$$
-
-<br>All CFR-samples in total are handles as the channel-state-information  [^1]:
-<br>
-
-$$H=\{ H(f_k)|j\in [1, K]|, K\in \mathbb{N} \}$$
-
-<br>
+- [MATLAB export](include/matlab_export/matlab_export.h) to generate .m files for plotting CFR and constellation diagrams (check [matlabXport](https://github.com/F-L-X-S/matlabXport))
+- [MUSIC Algorithm](music/music-spectrum.py) python app based on [pyespargos](https://github.com/ESPARGOS/pyespargos)
+- [Main Application](src/main.cc) to estimate the DoA of an OFDM transmitter 
+ 
+ [example projects](sandbox/) provided in ./sandbox demonstrate the usage of the provided modules. Note, that some may be deprecated. In this case, the [Main Application](src/main.cc) gives you a functioning example on how to employ the provided modules. 
+ The [Measurements](matlab/) show the MUSIC pseudospectrum and provide the corresponding datasets of the CFR and the received data-symbols from real-world measurement using two USRP N210 with WBX daughterboard. 
 
 ## Hardware Setup 
 The software is tested using two USRP N210 with the WBXv3 daughterboard. Phase synchronization is achieved with the MIMO-cable. The USRPs are connected to the host by separate ethernet interfaces. For utilizing a different type of SDRs, the interfaces can be implemented in separated threads similar to `multi_rx.h`.  <br>
