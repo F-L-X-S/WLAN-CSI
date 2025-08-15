@@ -5,7 +5,7 @@
 This project aims to provide a flexible software architecture, to implement and test DoA methods for various RF communication protocols.
 
 ## Main Features
--  [MultiSync](include/multisync/README.md) for simultaneous processing of multiple generic frame synchronizers based on [Liquid-DSP](https://liquidsdr.org)
+-  [MultiSync](include/multisync/README.md) for simultaneous processing and phase offset correction with multiple generic frame synchronizers based on [Liquid-DSP](https://liquidsdr.org)
 - [multi_rx.h](include/multi_rx/multi_rx.h) for synchronized processing of multiple USRP RX streams in separated threads
 - [ZMQ TCP interface](include/zmq_socket/README.md) for forwarding of CFRs to the python app running the DoA algorithm 
 - [MATLAB export](include/matlab_export/matlab_export.h) to generate .m files for plotting CFR and constellation diagrams (check [matlabXport](https://github.com/F-L-X-S/matlabXport))
