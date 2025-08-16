@@ -12,27 +12,41 @@
  * Framegeneration and synchronization is demonstrated in Liquid-DSP documentation on 
  * https://github.com/jgaeddert/liquid-dsp (Copyright (c) 2007 - 2016 Joseph Gaeddert).
  * 
- * Example Parameters:
+ * Signal Parameters:
  * Noise Floor: -90 dB (1e-9 W)
  * Signal-to-Noise Ratio (SNR): 40 dB (10e3) 
  * => Signal power |X|^2 = 40dB-90dB = -50 dB (1e-5W = 1e-9W * 10e3) 
  * 
- * Ofdmframe Parameters: 
+ * OFDM Parameters: 
  * M (Number of subcarriers): 64
  * M_pilot (Number of pilot subcarriers): 6
  * M_data (Number of data subcarriers): 44
  * M_S0 (Number of enabled subcarriers in S0 (STF)): 24 (Note, that Liquid enables every second subcarrier in S0 -> differs e.g. from the IEEE 802.11 standard)
  * M_S1 (Number of enabled subcarriers in S1 (LTF)): 50
+ * CP length: 16 
  * 
- * Expected CFR gain on subcarrier k (CFR estimated after LTF detected) : 
+ * Expected CFR gain on subcarrier k (CFR estimated after LTF detected): 
  * |S|=1  (training symbols S on subcarrier k defined with amplitude 1)
  * |X_k|^2 = (|X|^2)/(M_pilot+M_data) = 1e-5W / 50 = 2.0000e-07 W (Signal power on subcarrier k)
  * |X_k|= sqrt(2.0000e-07 W) = 4.4721e-04 V (Signal amplitude on subcarrier k)
  * 
- * CFR gain on subcarrier k (|CFR_k|) is defined as the ratio of the signal amplitude on subcarrier k to the amplitude of the training symbols S,
- * but FFT is not normalized in Liquid-DSP -> multiply by M to get the expected CFR gain:
- * -> |CFR_k| = [|X_k|/|S_k|]* M = (4.4721e-04 / 1)* 64 = 0.0286 
+ * CFR gain on subcarrier k (|H_k|) is defined as the ratio of the signal amplitude on subcarrier k X_k to the amplitude of the training symbol S_k,
+ * but FFT is normalized on subcarriers in Liquid-DSP -> multiply by M to get the expected CFR gain given by the synchronizer:
+ * -> |H_k| = [|X_k|/|S_k|]* M = (4.4721e-04 / 1)* 64 = 0.0286 
  * 
+ * Expected CFR phase on subcarrier k (CFR estimated after LTF detected): 
+ * in complex baseband for M subcarriers, M+CP samples are transmitted in time-domain -> normalized SampleRate = 1/(M+CP) = 1/(64+16) = 0.0125
+ * normalized subcarrier freq. spacing in complex baseband domain: df = SampleRate / M = 0.0125/64 = 1.9531e-04
+ * dphi_k = 2 * pi * f_k * tau = 2pi * k * df * tau (phase shift on subcarrier k due to time-delay tau)
+ * 
+ * e.g. DELAY = 0.5 samples -> normalized time-delay tau = 0.5/sampleRate = 0.5 * (M+CP) = 40:
+ *      k=-15: dphi_-15 = 2pi * -15 * 1.9531e-04 * 40 = -0.7363 rad
+ *      k=-1: dphi_1 = 2pi * -1.9531e-04 * 40 = -0.0491 rad
+ *      k=1: dphi_1 = 2pi * 1.9531e-04 * 40 = 0.0491 rad
+ *      k=15: dphi_15 = 2pi * 15 * 1.9531e-04 * 40 = 0.7363 rad
+ * 
+ * Note, that the vectorized output of the CFR results in a subcarrier numbering from 1 to M.
+ * This means, that the DC subcarrier at k=0 for located at (M/2)+1=33.
  * @version 0.1
  * @date 2025-05-20
  * 
