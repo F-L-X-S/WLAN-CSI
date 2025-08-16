@@ -66,7 +66,7 @@ static int callback(Sample_t* _X, unsigned char * _p, unsigned int _M, void * _c
             continue;
         static_cast<callback_data*>(_cb_data)->buffer.push_back(_X[i]);  
     }
-// No Reset after returning thefirst data symbol (return 0)
+// No Reset after returning the first data symbol (return 0)
 return 0;
 }
 
