@@ -12,6 +12,27 @@
  * Framegeneration and synchronization is demonstrated in Liquid-DSP documentation on 
  * https://github.com/jgaeddert/liquid-dsp (Copyright (c) 2007 - 2016 Joseph Gaeddert).
  * 
+ * Example Parameters:
+ * Noise Floor: -90 dB (1e-9 W)
+ * Signal-to-Noise Ratio (SNR): 40 dB (10e3) 
+ * => Signal power |X|^2 = 40dB-90dB = -50 dB (1e-5W = 1e-9W * 10e3) 
+ * 
+ * Ofdmframe Parameters: 
+ * M (Number of subcarriers): 64
+ * M_pilot (Number of pilot subcarriers): 6
+ * M_data (Number of data subcarriers): 44
+ * M_S0 (Number of enabled subcarriers in S0 (STF)): 24 (Note, that Liquid enables every second subcarrier in S0 -> differs e.g. from the IEEE 802.11 standard)
+ * M_S1 (Number of enabled subcarriers in S1 (LTF)): 50
+ * 
+ * Expected CFR gain on subcarrier k (CFR estimated after LTF detected) : 
+ * |S|=1  (training symbols S on subcarrier k defined with amplitude 1)
+ * |X_k|^2 = (|X|^2)/(M_pilot+M_data) = 1e-5W / 50 = 2.0000e-07 W (Signal power on subcarrier k)
+ * |X_k|= sqrt(2.0000e-07 W) = 4.4721e-04 V (Signal amplitude on subcarrier k)
+ * 
+ * CFR gain on subcarrier k (|CFR_k|) is defined as the ratio of the signal amplitude on subcarrier k to the amplitude of the training symbols S,
+ * but FFT is not normalized in Liquid-DSP -> multiply by M to get the expected CFR gain:
+ * -> |CFR_k| = [|X_k|/|S_k|]* M = (4.4721e-04 / 1)* 64 = 0.0286 
+ * 
  * @version 0.1
  * @date 2025-05-20
  * 
@@ -34,8 +55,8 @@
  
 
 // Definition of the channel impairments
-#define SNR_DB 37.0f                // Signal-to-noise ratio (dB)
-#define NOISE_FLOOR -92.0f          // Noise floor (dB)
+#define NOISE_FLOOR -90.0f          // Noise floor (dB) 
+#define SNR_DB 40.0f                // Signal-to-noise ratio (dB) 
 #define CARRIER_FREQ_OFFSET 0.01f   // Carrier frequency offset (radians per sample)
 #define CARRIER_PHASE_OFFSET 0.4    // Phase offset (radians) 
 #define DELAY 0.5f                  // Time-delay (samples)
