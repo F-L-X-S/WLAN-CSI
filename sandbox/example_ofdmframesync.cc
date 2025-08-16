@@ -40,8 +40,8 @@
  * dphi_k = 2 * pi * f_k * tau = 2pi * k * df * tau (phase shift on subcarrier k due to time-delay tau)
  * 
  * e.g. DELAY = 0.5 samples -> normalized time-delay tau = -0.5/sampleRate = -0.5 * (M+CP) = -40:
- *      k=-15:  dphi_-15 = 2pi * -15 * 1.9531e-04 * -40 = -0.7363 rad
- *      k=15:   dphi_15 = 2pi * 15 * 1.9531e-04 * 40 = 0.7363 rad
+ *      k=-15:  dphi_-15 = 2pi * -15 * 1.9531e-04 * -40 = 0.7363 rad
+ *      k=15:   dphi_15 = 2pi * 15 * 1.9531e-04 * -40 = -0.7363 rad
  * 
  * Note, that the vectorized output of the CFR results in a subcarrier numbering from 1 to M.
  * This means, that the DC subcarrier k=0 is located at (M/2)+1=33.
