@@ -79,7 +79,8 @@ static int callback(std::complex<float>* _X, unsigned char * _p, unsigned int _M
             continue;
         static_cast<CallbackData_t*>(_cb_data)->buffer.push_back(_X[i]);  
     }
-return 1;
+    // Reset synchronizer after returning the first data symbol (return 1)
+    return 1;
 }
 
 // Main function 
