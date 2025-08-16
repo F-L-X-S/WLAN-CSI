@@ -39,14 +39,12 @@
  * normalized subcarrier freq. spacing in complex baseband domain: df = SampleRate / M = 0.0125/64 = 1.9531e-04
  * dphi_k = 2 * pi * f_k * tau = 2pi * k * df * tau (phase shift on subcarrier k due to time-delay tau)
  * 
- * e.g. DELAY = 0.5 samples -> normalized time-delay tau = 0.5/sampleRate = 0.5 * (M+CP) = 40:
- *      k=-15: dphi_-15 = 2pi * -15 * 1.9531e-04 * 40 = -0.7363 rad
- *      k=-1: dphi_1 = 2pi * -1.9531e-04 * 40 = -0.0491 rad
- *      k=1: dphi_1 = 2pi * 1.9531e-04 * 40 = 0.0491 rad
- *      k=15: dphi_15 = 2pi * 15 * 1.9531e-04 * 40 = 0.7363 rad
+ * e.g. DELAY = 0.5 samples -> normalized time-delay tau = -0.5/sampleRate = -0.5 * (M+CP) = -40:
+ *      k=-15:  dphi_-15 = 2pi * -15 * 1.9531e-04 * -40 = -0.7363 rad
+ *      k=15:   dphi_15 = 2pi * 15 * 1.9531e-04 * 40 = 0.7363 rad
  * 
  * Note, that the vectorized output of the CFR results in a subcarrier numbering from 1 to M.
- * This means, that the DC subcarrier at k=0 for located at (M/2)+1=33.
+ * This means, that the DC subcarrier k=0 is located at (M/2)+1=33.
  * @version 0.1
  * @date 2025-05-20
  * 
@@ -71,8 +69,8 @@
 // Definition of the channel impairments
 #define NOISE_FLOOR -90.0f          // Noise floor (dB) 
 #define SNR_DB 40.0f                // Signal-to-noise ratio (dB) 
-#define CARRIER_FREQ_OFFSET 0.01f   // Carrier frequency offset (radians per sample)
-#define CARRIER_PHASE_OFFSET 0.4    // Phase offset (radians) 
+#define CARRIER_FREQ_OFFSET 0.0f    // Carrier frequency offset (radians per sample)
+#define CARRIER_PHASE_OFFSET 0.0    // Phase offset (radians) 
 #define DELAY 0.5f                  // Time-delay (samples)
 
 // Output file in MATLAB-format to store results
@@ -108,9 +106,6 @@ return 0;
 // main function
 int main(int argc, char*argv[])
 {
-    // set the random seed differently for each run
-    srand(time(NULL));
-
     // ---------------------- Signal Generation ----------------------
     // options
     unsigned int M           = 64;      // number of subcarriers 
