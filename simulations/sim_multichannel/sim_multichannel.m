@@ -1424,10 +1424,10 @@ subplot(4,1,3);plot(real(x_2)); hold on;  plot(imag(x_2));title('Baseband Signal
 subplot(4,1,4);plot(real(x_3)); hold on;  plot(imag(x_3));title('Baseband Signal Channel 3'), legend('Real', 'Imag');grid on;xlabel('Sample'); ylabel('Amplitude [V]');
 M = length(cfr_0); subcarrier_idx = (-floor(M/2)):(M-floor(M/2)-1);
 figure; subplot(2,1,1); hold on; grid on;
-plot(subcarrier_idx, abs(cfr_0));legend_labels{1} = sprintf('Channel %d', 0);
-plot(subcarrier_idx, abs(cfr_1));legend_labels{2} = sprintf('Channel %d', 1);
-plot(subcarrier_idx, abs(cfr_2));legend_labels{3} = sprintf('Channel %d', 2);
-plot(subcarrier_idx, abs(cfr_3));legend_labels{4} = sprintf('Channel %d', 3);
+plot(subcarrier_idx, abs(cfr_0));legend_labels{1} = sprintf('CH %d', 0);
+plot(subcarrier_idx, abs(cfr_1));legend_labels{2} = sprintf('CH %d', 1);
+plot(subcarrier_idx, abs(cfr_2));legend_labels{3} = sprintf('CH %d', 2);
+plot(subcarrier_idx, abs(cfr_3));legend_labels{4} = sprintf('CH %d', 3);
 title('Channel Frequency Response Gain');xlabel('Subcarrier index'); ylabel('Gain [V^2]');xlim([subcarrier_idx(1), subcarrier_idx(end)]);legend(legend_labels, 'Location', 'best');hold off;
 subplot(2,1,2); hold on; grid on;
 plot(subcarrier_idx, angle(cfr_0));

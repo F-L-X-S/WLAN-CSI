@@ -261,7 +261,7 @@ int main(int argc, char*argv[])
         std::string ch_suffix = std::to_string(ch);
         m_file.Add(
             "plot(subcarrier_idx, abs(cfr_" + ch_suffix + "));"
-            "legend_labels{" + std::to_string(ch + 1) + "} = sprintf('Channel %d', " + std::to_string(ch) + ");"
+            "legend_labels{" + std::to_string(ch + 1) + "} = sprintf('CH %d', " + std::to_string(ch) + ");"
         );
     }
     m_file.Add(
