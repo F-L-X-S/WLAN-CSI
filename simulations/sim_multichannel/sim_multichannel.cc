@@ -33,9 +33,18 @@
  * normalized subcarrier freq. spacing in complex baseband domain: df = SampleRate / M = 0.0125/64 = 1.9531e-04
  * dphi_k = 2 * pi * f_k * tau = 2pi * k * df * tau (phase shift on subcarrier k due to time-delay tau)
  * 
- * e.g. DELAY = 0.5 samples -> normalized time-delay tau = -0.5/sampleRate = -0.5 * (M+CP) = -40:
- *      k=-15:  dphi_-15 = 2pi * -15 * 1.9531e-04 * -40 = 0.7363 rad
- *      k=15:   dphi_15 = 2pi * 15 * 1.9531e-04 * -40 = -0.7363 rad
+ * e.g. DELAY = 0.1 samples, DDELAY = 0.1 samples 
+ *      -> total delay: CH0: 0.1 samples, CH1: 0.2 samples, CH2: 0.3 samples, CH3: 0.4 samples
+ *      -> normalized time-delay tau for 0.1 samples: -0.1/sampleRate = -0.1 * (M+CP) = -8
+ * 
+ *      CH0 (tau=-8)        k=-15:  dphi_-15 = 2*pi * -15 * 1.9531e-04 * -8 = 0.1473 rad
+ *                          k=15:   dphi_15 = 2*pi * 15 * 1.9531e-04 * -8 = -0.1473 rad
+ *      CH1 (tau=-16)       k=-15:  dphi_-15 = 2*pi * -15 * 1.9531e-04 * -16 = 0.2945 rad
+ *                          k=15:   dphi_15 = 2*pi * 15 * 1.9531e-04 * -16 = -0.2945 rad
+ *      CH2 (tau=-24)       k=-15:  dphi_-15 = 2*pi * -15 * 1.9531e-04 * -24 = 0.4418 rad
+ *                          k=15:   dphi_15 = 2*pi * 15 * 1.9531e-04 * -24 = -0.4418 rad
+ *      CH3 (tau=-32)       k=-15:  dphi_-15 = 2*pi * -15 * 1.9531e-04 * -32 = 0.5890 rad
+ *                          k=15:   dphi_15 = 2*pi * 15 * 1.9531e-04 * -32 = -0.5890 rad
  * 
  * @version 0.1
  * @date 2025-05-20
@@ -65,7 +74,7 @@
 #define SNR_DB 40.0f                // Signal-to-noise ratio (dB) 
 #define CARRIER_FREQ_OFFSET 0.0f    // Carrier frequency offset (radians per sample)
 #define CARRIER_PHASE_OFFSET 0.0    // Phase offset (radians) 
-#define DELAY 0.5f                  // Time-delay (samples)
+#define DELAY 0.1f                  // Time-delay (samples)
 #define DDELAY 0.1f                // Differential Delay between receiving channels (samples)
 
 // Output file in MATLAB-format to store results
