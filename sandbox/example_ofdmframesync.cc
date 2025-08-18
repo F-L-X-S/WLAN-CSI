@@ -43,8 +43,6 @@
  *      k=-15:  dphi_-15 = 2pi * -15 * 1.9531e-04 * -40 = 0.7363 rad
  *      k=15:   dphi_15 = 2pi * 15 * 1.9531e-04 * -40 = -0.7363 rad
  * 
- * Note, that the vectorized output of the CFR results in a subcarrier numbering from 1 to M.
- * This means, that the DC subcarrier k=0 is located at (M/2)+1=33.
  * @version 0.1
  * @date 2025-05-20
  * 
