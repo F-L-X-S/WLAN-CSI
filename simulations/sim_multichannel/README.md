@@ -1,6 +1,6 @@
 # Simulation of Multi-Channel CFR Estimation
 
-The functionality of the implemented ```MultiSync``` class is validated through a [multi-channel simulation](simulations/sim_multichannel/sim_multichannel.cc), which builds upon the [single-channel simulation](simulations/sim_singlechannel/sim_singlechannel.cc). 
+The functionality of the implemented ```MultiSync``` class is validated through a [multi-channel simulation](sim_multichannel.cc), which builds upon the [single-channel simulation](../sim_singlechannel/README.md). 
 The simulation performs the following steps:
 
 - Generation of an OFDM frame containing QPSK data symbols in the complex baseband domain  
