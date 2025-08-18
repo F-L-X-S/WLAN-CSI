@@ -12,8 +12,11 @@ This project aims to provide a flexible software architecture, to implement and 
 - [MUSIC Algorithm](music/music-spectrum.py) (multiple signal classification) python app based on [pyespargos](https://github.com/ESPARGOS/pyespargos) 
 - [Main Application](src/main.cc) to estimate the DoA of an OFDM transmitter using USRPs connected via UHD
 
- [example projects](sandbox/) provided in ./sandbox demonstrate the usage of the provided modules. Note, that some may be deprecated. In this case, the [Main Application](src/main.cc) gives you a functioning example on how to employ the provided modules. 
- The [Measurements](matlab/) show the MUSIC pseudospectrum and provide the corresponding datasets of the CFR and the received data-symbols from real-world measurement using two USRP N210 with WBX daughterboard. 
+ [Simulations](simulations/) provided in ./simulations demonstrate the usage of the provided modules, illustrate the underlying mathematical concepts and show the simulation results.
+ 
+[Measurements](measurements/) show the real-world DoA results of the [Application](src/main.cc) using two USRP N210 with WBX daughterboard and provide the corresponding datasets.
+
+ The [Main Application](src/main.cc) gives you a functioning example on how to employ the provided modules for DoA estimation with USRP N210. 
 
 ## Hardware Setup 
 The software is tested using two USRP N210 with the WBXv3 daughterboard. Phase synchronization is achieved with the MIMO-cable. The USRPs are connected to the host by separate ethernet interfaces. For utilizing a different type of SDRs, the interfaces can be implemented in separated threads similar to `multi_rx.h`.  <br>
