@@ -1,4 +1,4 @@
-# Simulation of CFR Estimation in Single-Channel Frame Detection
+# Simulation of Single-Channel CFR Estimation
 
 To validate the approach of exporting the CFR as the gain estimate from the ofdmframesync module, the simulation simulations/sim_singlechannel/sim_singlechannel.cc was developed. This simulation illustrates the effect of a time delay on the CFR of a synchronized OFDM frame, observed as a linear phase shift across the subcarriers. For further analysis and visualization, the generated complex baseband sequence, the CFR, the estimated CFO, and the detected data symbols are exported using a custom MATLAB code generator (defined in ./include/matlab_export/matlab_export.h), which outputs variables and commands to a specified .m file. The simulation performs the following steps: 
 
