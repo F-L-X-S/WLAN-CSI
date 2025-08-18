@@ -82,12 +82,12 @@ The CFR for the simulation parameters defined in Table \ref{fig:sim_singlechanne
 <br>
 
 ### Generated baseband sequence with the specified channel impairments
-<img src="https://raw.githubusercontent.com/F-L-X-S/doa4rfc" alt="sim_singlechannel_signal.svg" style="width:100%;">
+<img src="https://raw.githubusercontent.com/F-L-X-S/doa4rfc/refs/heads/main/docs/assets/sim_singlechannel/sim_singlechannel_signal.svg" alt="sim_singlechannel_signal.svg" style="width:100%;">
 
 ### Estimated CFR 
-<img src="https://raw.githubusercontent.com/F-L-X-S/doa4rfc" alt="sim_singlechannel_signal.svg" style="width:100%;">
-<img src="https://raw.githubusercontent.com/F-L-X-S/doa4rfc" alt="sim_singlechannel_signal.svg" style="width:100%;">
+<img src="https://raw.githubusercontent.com/F-L-X-S/doa4rfc/refs/heads/main/docs/assets/sim_singlechannel/sim_singlechannel_cfr.svg" alt="sim_singlechannel_cfr.svg" style="width:100%;">
+<img src="https://raw.githubusercontent.com/F-L-X-S/doa4rfc/refs/heads/main/docs/assets/sim_singlechannel/sim_singlechannel_cfr_complex.svg" alt="sim_singlechannel_cfr_complex.svg" style="width:100%;">
 
 ### Detected Datasymbols 
 (only first OFDM symbol)
-<img src="https://raw.githubusercontent.com/F-L-X-S/doa4rfc" alt="sim_singlechannel_signal.svg" style="width:100%;">
+<img src="https://raw.githubusercontent.com/F-L-X-S/doa4rfc/refs/heads/main/docs/assets/sim_singlechannel/sim_singlechannel_detection.svg" alt="sim_singlechannel_detection.svg" style="width:100%;">
