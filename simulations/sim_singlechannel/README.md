@@ -26,57 +26,57 @@ Chosen simulation parameters:
 
 The expected gain on subcarrier $k$ in the CFR estimated after detection of the LTF, is described as follows. The total signal power 
  
- $$
+ ```math
 |X|^2 = 40dB-90dB = -50 dB = 1*10^{-5} \mathrm{V^2}
- $$
+ ```
  
 is distributed over the active subcarriers $M_{\mathrm{pilot}} + M_{\mathrm{data}}$. The resulting signal power on subcarrier $k$ is therefore
  
-$$ 
+```math
 |X_k|^2 = \frac{|X|^2}{M_{\mathrm{pilot}} + M_{\mathrm{data}}} = \frac{10^{-5}\,\mathrm{V^2}}{6+44} = 2.0 * 10^{-7}\,\mathrm{V^2}
-$$
+```
  
 and the corresponding signal amplitude is
  
-$$
+```math
 |X_k| = \sqrt{|X_k|^2} = 4.4721 * 10^{-4}\,\mathrm{V}
-$$
+```
  
 The CFR gain on subcarrier $k$, $|H_k|$, is defined as the ratio of the signal amplitude $|X_k|$ to the amplitude of the training symbol $|S_k|$. Because the FFT in Liquid-DSP is normalized over the subcarriers, an additional factor of $M$ must be applied to obtain the expected CFR gain as output by the synchronizer:
  
-$$
+```math
 |H_k| = \frac{|X_k|}{|S_k|} * M
         = (4.4721 * 10^{-4}) * 64 
         = 0.0286
-$$
+```
  
 Since the CFRs phase response is expected to be linear across the enabled frequency band, calculating the phase shift for two subcarriers is sufficient to determine the expected behavior. For the calculations in the complex baseband, a normalized time unit $[T_n]$ equivalent to a single baseband sample time is defined. For $M$ subcarriers, $M+\text{cp}$ samples are transmitted in the time domain, resulting in a normalized sample rate of the baseband sequence of
  
-$$
+```math
 R_S = \frac{1}{M+\text{cp}} = \frac{1}{64+16} = 0.0125 \quad[T_n^{-1}]
-$$
+```
  
 This results in a normalized subcarrier frequency spacing $\Delta f_n$ in the complex baseband domain of
  
-$$
+```math
 \Delta f_n = \frac{R_S}{M} = \frac{0.0125}{64} = 1.9531 \times 10^{-4}  \quad[T_n^{-1}]
-$$
+```
  
 Considering a ```DELAY``` of $0.5$ samples applied to the fractional delay filter, the normalized time delay is
  
-$$
+```math
 \tau_n = -0.5 / R_S = -0.5 * (M+\text{cp}) = -40 \quad[T_n]
-$$
+```
  
 For two representative subcarriers at $k = \pm 15$, the resulting phase $\Delta\phi=2\pi f \tau$ is given by
  
-$$
+```math
 \Delta\phi_{-15} = 2\pi \cdot (-15) \cdot 1.9531 \times 10^{-4} \cdot (-40) = 0.7363\,\mathrm{rad}
-$$
+```
  
-$$
+```math
 \Delta\phi_{15} = 2\pi \cdot 15 \cdot 1.9531 \times 10^{-4} \cdot (-40) = -0.7363\,\mathrm{rad}
-$$
+```
  
 The CFR for the simulation parameters defined in Table \ref{fig:sim_singlechannel_parameters} with a fractional delay of 0.5 samples is expected to show an equal subcarrier gain of $|H_k|=0.0286$ for all $M_{data}+M_{pilot}$ subcarriers in the transmission bandwidth and a linear phase shift that intersects $\Delta\phi_{-15}$ and $\Delta\phi_{15}$. 
  
