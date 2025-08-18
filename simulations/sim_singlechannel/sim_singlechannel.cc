@@ -1,5 +1,5 @@
 /**
- * @file example_ofdmframesync.cc
+ * @file sim_singlechannel.cc
  * @brief This example illustrates the impact of a time-delay on the channel frequency response (CFR) of a synchronized OFDM frame, 
  * observed as a linear phase shift across the subcarriers.
  * 
@@ -9,7 +9,7 @@
  * For analysis and visualization in MATLAB, the channel frequency response, carrier frequency offset, and the data symbols 
  * estimated by the Liquid-DSP ofdmframesync synchronizer are exported.
  * 
- * Framegeneration and synchronization is demonstrated in Liquid-DSP documentation on 
+ * Framegeneration and synchronization for ofdmframesync is demonstrated in Liquid-DSP documentation on 
  * https://github.com/jgaeddert/liquid-dsp (Copyright (c) 2007 - 2016 Joseph Gaeddert).
  * 
  * Signal Parameters:
@@ -72,7 +72,7 @@
 #define DELAY 0.5f                  // Time-delay (samples)
 
 // Output file in MATLAB-format to store results
-#define OUTFILE "./matlab/examples/example_ofdmframesync.m" 
+#define OUTFILE "./simulations/sim_singlechannel/sim_singlechannel.m" 
 
 // Sample type
 using Sample_t = std::complex<float>;   

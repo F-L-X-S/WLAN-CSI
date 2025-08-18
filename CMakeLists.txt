@@ -95,13 +95,40 @@ target_link_libraries(
     ${Boost_LIBRARIES}
   )
 
+# ---------- Simulations ----------------
+# Define source files
+set(SIMULATIONS_SRC_FILES
+  simulations/sim_singlechannel/sim_singlechannel.cc
+)
+
+# Iterate over each file in SOURCE_FILES
+foreach(SOURCE_FILE ${SIMULATIONS_SRC_FILES})
+  # Extract the filename without the directory and extension
+  get_filename_component(EXECUTABLE_NAME ${SOURCE_FILE} NAME_WE)
+
+  # Create an executable for each source file
+  add_executable(${EXECUTABLE_NAME} ${SOURCE_FILE})
+
+  # Link libraries to the executable
+  target_link_libraries(${EXECUTABLE_NAME}
+    power_trigger_lib
+    auto_corr_lib
+    signal_generator_lib
+    matlab_export_lib
+    liquid
+    zmq_socket
+    ${UHD_LIBRARIES}
+    ${Boost_LIBRARIES}
+  )
+
+endforeach()
+
 # ---------- Sandbox ----------------
 # Define source files
 set(SANDBOX_SRC_FILES
   sandbox/example_symsync_get_tau.cc
   sandbox/example_auto_correlation.cc
   sandbox/example_qdsync.cc
-  sandbox/example_ofdmframesync.cc
   sandbox/example_ofdm_multisync.cc
   sandbox/example_music.cc
   sandbox/example_usrp.cc
