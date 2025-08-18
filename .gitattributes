@@ -1,0 +1,2 @@
+# exclude matlab files from linguist processing
+*.m linguist-vendored
