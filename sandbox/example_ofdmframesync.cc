@@ -217,7 +217,7 @@ int main(int argc, char*argv[])
 
     // Plot complex baseband signal
     .Add("figure; subplot(2,1,1); plot(real(x)); hold on;  plot(imag(x));" 
-        "title('Received signal'), legend('Real', 'Imag');grid on;"
+        "title('Baseband Signal'), legend('Real', 'Imag');grid on;"
         "xlabel('Sample'); ylabel('Amplitude [V]');")
 
     // Plot CFO estimate
@@ -237,7 +237,7 @@ int main(int argc, char*argv[])
 
     // Plot CFR in complex plane
     .Add("figure; plot(real(cfr), imag(cfr), '.', 'MarkerSize', 10);" 
-        "grid on; axis equal; xlabel('In-Phase'); ylabel('Quadrature');" 
+        "grid on; axis equal; xlabel('Real'); ylabel('Imaginary');" 
         "title('Channel frequency response'); axis([-1 1 -1 1]);")
 
     // Plot detected symbols in complex plane
