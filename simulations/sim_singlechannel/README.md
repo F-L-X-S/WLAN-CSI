@@ -1,14 +1,14 @@
 # Simulation of CFR Estimation in Single-Channel Frame Detection
 
-To validate the approach of exporting the CFR as the gain estimate from the ofdmframesync module, the simulation simulations/sim_singlechannel/sim_singlechannel.cc was developed. This simulation illustrates the effect of a time delay on the CFR of a synchronized OFDM frame, observed as a linear phase shift across the subcarriers. For further analysis and visualization, the generated complex baseband sequence, the CFR, the estimated CFO, and the detected data symbols are exported using a custom MATLAB code generator (defined in ./include/matlab\_export/matlab\_export.h), which outputs variables and commands to a specified .m file. The simulation performs the following steps: 
+To validate the approach of exporting the CFR as the gain estimate from the ofdmframesync module, the simulation simulations/sim_singlechannel/sim_singlechannel.cc was developed. This simulation illustrates the effect of a time delay on the CFR of a synchronized OFDM frame, observed as a linear phase shift across the subcarriers. For further analysis and visualization, the generated complex baseband sequence, the CFR, the estimated CFO, and the detected data symbols are exported using a custom MATLAB code generator (defined in ./include/matlab_export/matlab_export.h), which outputs variables and commands to a specified .m file. The simulation performs the following steps: 
 
 - Generation of an OFDM frame with QPSK data symbols in the complex baseband domain
 - Embedding of the OFDM frame's time-domain sequence within a longer signal sequence to emulate transmission
-- Simulation of noise effects using Liquid-DSP’s \texttt{channel\_cccf} module
+- Simulation of noise effects using Liquid-DSP’s ```channel_cccf``` module
 - Application of a fractional delay filter to model time-delay effects
 - Frame synchronization with the modified ofdmframesync module
 - Extraction and export of the CFR and the first OFDM symbol 
-- Generation of MATLAB script to plot the received time-domain sequence, the CFR, the estimated \acrshort{cfo} and the detected data symbols
+- Generation of MATLAB script to plot the received time-domain sequence, the CFR, the estimated CFO and the detected data symbols
 
 Chosen simulation parameters:
 | Parameter                              | Symbol           | Value  |
@@ -78,7 +78,7 @@ For two representative subcarriers at $k = \pm 15$, the resulting phase $\Delta\
 \Delta\phi_{15} = 2\pi \cdot 15 \cdot 1.9531 \times 10^{-4} \cdot (-40) = -0.7363\,\mathrm{rad}
 ```
  
-The CFR for the simulation parameters defined in Table \ref{fig:sim_singlechannel_parameters} with a fractional delay of 0.5 samples is expected to show an equal subcarrier gain of $|H_k|=0.0286$ for all $M_{data}+M_{pilot}$ subcarriers in the transmission bandwidth and a linear phase shift that intersects $\Delta\phi_{-15}$ and $\Delta\phi_{15}$. 
+The CFR for the shown simulation parameters is expected to show an equal subcarrier gain of $|H_k|=0.0286$ for all $M_{data}+M_{pilot}$ subcarriers in the transmission bandwidth and a linear phase shift that intersects $\Delta\phi_{-15}$ and $\Delta\phi_{15}$. 
  
 
 ### Generated baseband sequence with the specified channel impairments
