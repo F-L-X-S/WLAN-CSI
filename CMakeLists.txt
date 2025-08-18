@@ -99,6 +99,7 @@ target_link_libraries(
 # Define source files
 set(SIMULATIONS_SRC_FILES
   simulations/sim_singlechannel/sim_singlechannel.cc
+  simulations/sim_multichannel/sim_multichannel.cc
 )
 
 # Iterate over each file in SOURCE_FILES
