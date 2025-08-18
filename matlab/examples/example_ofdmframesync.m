@@ -596,9 +596,10 @@ cfr = [ ...
 0.0183432 + 1i*-0.0219512, 0.017249 + 1i*-0.022831, 0.016116 + 1i*-0.023656, 0.0149473 + 1i*-0.0244246, 0.0137462 + 1i*-0.0251354,  ...
 0.0125159 + 1i*-0.0257873, 0.0112597 + 1i*-0.0263793, 0.00998116 + 1i*-0.0269108, 0 + 1i*0, 0 + 1i*0,  ...
 0 + 1i*0, 0 + 1i*0, 0 + 1i*0, 0 + 1i*0];
-figure; subplot(2,1,1); plot(real(x)); hold on;  plot(imag(x));title('Received signal'), legend('Real', 'Imag');grid on;
-subplot(2,1,2); plot(cfo); title('Carrier frequency offset');grid on;
-figure; subplot(2,1,1); plot(abs(cfr)); title('Channel frequency response Gain');grid on;
-subplot(2,1,2); plot(angle(cfr)); title('Channel frequency response Phase');grid on;
+figure; subplot(2,1,1); plot(real(x)); hold on;  plot(imag(x));title('Received signal'), legend('Real', 'Imag');grid on;xlabel('Sample'); ylabel('Amplitude [V]');
+subplot(2,1,2); plot(cfo); title('Carrier frequency offset');grid on;xlabel('Sample'); ylabel('CFO [rad/sample]');
+M = length(cfr); subcarrier_idx = (-floor(M/2)):(M-floor(M/2)-1);
+figure; subplot(2,1,1); plot(subcarrier_idx, abs(cfr)); title('Channel frequency response Gain');grid on;xlim([subcarrier_idx(1), subcarrier_idx(end)]); xlabel('Subcarrier index'); ylabel('Gain [V^2]');
+subplot(2,1,2); plot(subcarrier_idx, angle(cfr)); title('Channel frequency response Phase');grid on;xlim([subcarrier_idx(1), subcarrier_idx(end)]); xlabel('Subcarrier index'); ylabel('Phase [rad]');
 figure; plot(real(cfr), imag(cfr), '.', 'MarkerSize', 10);grid on; axis equal; xlabel('In-Phase'); ylabel('Quadrature');title('Channel frequency response'); axis([-1 1 -1 1]);
 figure; plot(real(datasymbols), imag(datasymbols), '.', 'MarkerSize', 10);grid on; axis equal; xlabel('In-Phase'); ylabel('Quadrature');title('Detected Symbols'); axis([-1 1 -1 1]);

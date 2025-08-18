@@ -217,13 +217,23 @@ int main(int argc, char*argv[])
 
     // Plot complex baseband signal
     .Add("figure; subplot(2,1,1); plot(real(x)); hold on;  plot(imag(x));" 
-        "title('Received signal'), legend('Real', 'Imag');grid on;")
-    // Plot corresponding CFO estimate
-    .Add("subplot(2,1,2); plot(cfo); title('Carrier frequency offset');grid on;")
+        "title('Received signal'), legend('Real', 'Imag');grid on;"
+        "xlabel('Sample'); ylabel('Amplitude [V]');")
 
-    // Plot CFR Gain and Phase
-    .Add("figure; subplot(2,1,1); plot(abs(cfr)); title('Channel frequency response Gain');grid on;")
-    .Add("subplot(2,1,2); plot(angle(cfr)); title('Channel frequency response Phase');grid on;")
+    // Plot CFO estimate
+    .Add("subplot(2,1,2); plot(cfo); title('Carrier frequency offset');grid on;"
+        "xlabel('Sample'); ylabel('CFO [rad/sample]');")
+
+    // Add subcarrier index vector
+    .Add("M = length(cfr); subcarrier_idx = (-floor(M/2)):(M-floor(M/2)-1);")
+
+    // Plot CFR Gain
+    .Add("figure; subplot(2,1,1); plot(subcarrier_idx, abs(cfr)); title('Channel frequency response Gain');grid on;"
+        "xlim([subcarrier_idx(1), subcarrier_idx(end)]); xlabel('Subcarrier index'); ylabel('Gain [V^2]');")
+
+    // Plot CFR Phase
+    .Add("subplot(2,1,2); plot(subcarrier_idx, angle(cfr)); title('Channel frequency response Phase');grid on;"
+        "xlim([subcarrier_idx(1), subcarrier_idx(end)]); xlabel('Subcarrier index'); ylabel('Phase [rad]');")
 
     // Plot CFR in complex plane
     .Add("figure; plot(real(cfr), imag(cfr), '.', 'MarkerSize', 10);" 
