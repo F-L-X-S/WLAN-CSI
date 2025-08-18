@@ -46,6 +46,9 @@
  *      CH3 (tau=-32)       k=-15:  dphi_-15 = 2*pi * -15 * 1.9531e-04 * -32 = 0.5890 rad
  *                          k=15:   dphi_15 = 2*pi * 15 * 1.9531e-04 * -32 = -0.5890 rad
  * 
+ * Note, that the fdelay filter causes phase-distortion on some delay-values. 
+ * The predefined values of DELAY and DDELAY are chosen to avoid this distortion.
+ * 
  * @version 0.1
  * @date 2025-05-20
  * 
@@ -75,7 +78,7 @@
 #define CARRIER_FREQ_OFFSET 0.0f    // Carrier frequency offset (radians per sample)
 #define CARRIER_PHASE_OFFSET 0.0    // Phase offset (radians) 
 #define DELAY 0.1f                  // Time-delay (samples)
-#define DDELAY 0.1f                // Differential Delay between receiving channels (samples)
+#define DDELAY 0.1f                 // Differential Delay between receiving channels (samples)
 
 // Output file in MATLAB-format to store results
 #define OUTFILE "simulations/sim_multichannel/sim_multichannel.m" 
@@ -86,7 +89,7 @@ using Sample_t = std::complex<float>;
 // custom data type to pass to callback function
 struct callback_data {
     std::vector<Sample_t> buffer;        // Buffer to store detected symbols 
-    std::vector<float> cfo;                         // carrier frequency offsets estimated per sample 
+    std::vector<float> cfo;              // carrier frequency offsets estimated per sample 
     std::vector<Sample_t> cfr;           // channel frequency response 
 };
 
@@ -116,7 +119,7 @@ int main(int argc, char*argv[])
     unsigned int cp_len      = 16;      // cyclic prefix length (800ns for 20MHz => 16 Sample)
     unsigned int taper_len   = 4;       // window taper length 
 
-    unsigned int frame_len   = M + cp_len;            // frame length in samples
+    unsigned int frame_len   = M + cp_len;            // Frame-length in samples
     
     // Check if the number of samples is sufficient to contain the frame
     unsigned int frame_samples = (3+SYMBOLS_PER_FRAME)*frame_len; // S0a + S0b + S1 + data symbols
@@ -166,7 +169,7 @@ int main(int argc, char*argv[])
     ofdmframegen_destroy(fg);
 
     // ------------------- Channel impairments ----------------------
-    // create reference channel and add impairments
+    // Create reference channel and add impairments
     channel_cccf base_channel = channel_cccf_create();
     channel_cccf_add_carrier_offset(base_channel, CARRIER_FREQ_OFFSET, CARRIER_PHASE_OFFSET);    // Add Carrier Frequency Offset and Phase Offset
 
@@ -207,9 +210,8 @@ int main(int argc, char*argv[])
 
     
     // ----------------- Synchronization ----------------------
-    struct callback_data cb_data[NUM_CHANNELS];             // Callback data buffer 
-    //std::vector<void*> userdata(NUM_CHANNELS, &cb_data);    // Pointers to callback data buffer for each channel 
-    void* userdata[NUM_CHANNELS];
+    struct callback_data cb_data[NUM_CHANNELS];                 // Callback data buffer 
+    void* userdata[NUM_CHANNELS];                               // Pointers to callback data buffer for each channel 
 
     // Array of Pointers to CB-Data 
     for (unsigned int i = 0; i < NUM_CHANNELS; ++i)

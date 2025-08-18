@@ -43,6 +43,9 @@
  *      k=-15:  dphi_-15 = 2pi * -15 * 1.9531e-04 * -40 = 0.7363 rad
  *      k=15:   dphi_15 = 2pi * 15 * 1.9531e-04 * -40 = -0.7363 rad
  * 
+ * Note, that the fdelay filter causes phase-distortion on some delay-values. 
+ * The predefined values of DELAY and DDELAY are chosen to avoid this distortion.
+ * 
  * @version 0.1
  * @date 2025-05-20
  * 
