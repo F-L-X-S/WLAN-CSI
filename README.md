@@ -17,17 +17,19 @@ This project aims to provide a flexible software architecture, to implement and 
 - [Single-Channel CFR-Estimation](simulations/sim_singlechannel/README.md) 
 - [Multi-Channel CFR-Estimation](simulations/sim_multichannel/README.md)
  
+## Measurements
 [Measurements](measurements/) show the real-world DoA results of the [Application](src/main.cc) using two USRP N210 with WBX daughterboard and provide the corresponding datasets.
 
+## DoA estimation with USRP N210
  The [Main Application](src/main.cc) gives you a functioning example on how to employ the provided modules for DoA estimation with USRP N210. 
 
-## Hardware Setup 
+### Hardware Setup 
 The software is tested using two USRP N210 with the WBXv3 daughterboard. Phase synchronization is achieved with the MIMO-cable. The USRPs are connected to the host by separate ethernet interfaces. For utilizing a different type of SDRs, the interfaces can be implemented in separated threads similar to `multi_rx.h`.  <br>
 One USRP is used for transmitting and receiving the OFDM packages while the other USRP is used in RX-mode only. The MUSIC-spectrum visualizes the position of the TX-antenna. 
  <br>
 Make sure, the receiving antennas are spaced by the half wavelength of the carrier frequency (e.g. 12cm for a carrier of 1.25GHz).
 
-## Installation 
+### Installation 
 1. Clone the Repo to your local machine
 2. Setup a virtual environment within the `./music/`directory <br>
    ```
@@ -46,15 +48,7 @@ Make sure, the receiving antennas are spaced by the half wavelength of the carri
 
 Make sure, that all USRPs are connected via separate Ethernet interfaces, since the datarate can possibly cause overflows in the shared-Etehrnet mode. Check the USRP connection by running `uhd_find_devices`. 
 
-## Main Dependencies
+### Main Dependencies
 - [ZMQ](https://zeromq.org/languages/cplusplus/) for socket communication with the Python-implemented DoA Algorithm 
 - [Liquid-DSP](https://liquidsdr.org) for frame-detection, generation and synchronization
 - [UHD](https://files.ettus.com/manual/index.html) for USRP communication
-
-## References
-[^1]: Zheng Yang, Yi Zhang, Guoxuan Chi, Guidong Zhang, "Hands-on Wireless Sensing with Wi-Fi: A Tutorial" tns.thss.tsinghua.edu.cn, 2023, https://tns.thss.tsinghua.edu.cn/wst/docs/pre/
-(accessed April 4, 2025)
-
-[^2]: "IEEE Standard for Information technology--Telecommunications and information exchange between systems Local and metropolitan area networks--Specific requirements Part 11: Wireless LAN Medium Access Control (MAC) and Physical Layer (PHY) Specifications," in IEEE Std 802.11-2012 (Revision of IEEE Std 802.11-2007) , vol., no., pp.1-2793, 29 March 2012, doi: 10.1109/IEEESTD.2012.6178212.
-
-[^3]: Lin, N., Yun, Z., Zhou, S., & Han, S. (2025). GR-WiFi: A GNU Radio based WiFi Platform with Single-User and Multi-User MIMO Capability. ArXiv, abs/2501.06176.
