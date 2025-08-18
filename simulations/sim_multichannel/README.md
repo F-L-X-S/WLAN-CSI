@@ -100,7 +100,3 @@ It should be noted that the fractional delay filter ```fdelay_crcf``` causes pha
 ### Estimated CFR 
 <img src="https://raw.githubusercontent.com/F-L-X-S/doa4rfc/refs/heads/main/docs/assets/sim_multichannel/sim_multichannel_cfr.svg" alt="sim_multichannel_cfr.svg" style="width:75%;">
 <img src="https://raw.githubusercontent.com/F-L-X-S/doa4rfc/refs/heads/main/docs/assets/sim_multichannel/sim_multichannel_cfr_complex.svg" alt="sim_multichannel_cfr_complex.svg" style="width:75%;">
-
-### Detected Datasymbols 
-(only first OFDM symbol)
-<img src="https://raw.githubusercontent.com/F-L-X-S/doa4rfc/refs/heads/main/docs/assets/sim_multichannel/sim_multichannel_detection.svg" alt="sim_multichannel_detection.svg" style="width75%;">
