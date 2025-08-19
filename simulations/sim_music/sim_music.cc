@@ -4,6 +4,9 @@
  * 
  * @brief 
  * 
+ * CARRIER_FREQUENCY is chosen proportional to WLAN Channel 1 but for frequency-spacing of 1: 
+ * 2.412GHz/20MHz = 120.6, 64 * 120.6 = 7718.4 
+ * 
  * The complex baseband signal is resampled to match the NCO steps. 
  * -> Resampling-factor is 2*PI*CARRIER_FREQUENCY/M 
  * -> One sample of the modulated signal corresponds to a time step of 1/(2*PI*CARRIER_FREQUENCY)
