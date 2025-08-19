@@ -140,17 +140,16 @@ int main(int argc, char*argv[])
     float r = (float)(2*M_PI*CARRIER_FREQUENCY/(M));
 
     // Resample signal to match carrier
-    unsigned int tx_len = (unsigned int)(frame_samples*ceil(r));
-    Sample_t tx[tx_len];
+    std::vector<Sample_t> tx((unsigned int)(frame_samples*ceil(r)));    // Resampled signal buffer
     msresamp_crcf resamp_tx = msresamp_crcf_create(r,60.0);
     unsigned int ny;
-    msresamp_crcf_execute(resamp_tx, tx_base.data(), frame_samples, tx, &ny);
+    msresamp_crcf_execute(resamp_tx, tx_base.data(), tx_base.size(), tx.data(), &ny);
     msresamp_crcf_destroy(resamp_tx);
 
     // Mix Up 
     nco_crcf nco_tx = nco_crcf_create(LIQUID_NCO);
     nco_crcf_set_frequency(nco_tx, 2*M_PI*CARRIER_FREQUENCY);
-    nco_crcf_mix_block_up(nco_tx, tx, tx, tx_len);
+    nco_crcf_mix_block_up(nco_tx, tx.data(), tx.data(), tx.size());
     nco_crcf_destroy(nco_tx);                               
 
     // ------------------- Channel impairments and Downconversion ---------------------
@@ -184,7 +183,7 @@ int main(int argc, char*argv[])
         // Insert the baseband-sequence into the longer sequence at the specified start position 'TF_SYMBOL_START' 
         unsigned int resampled_len = (unsigned int)ceil(r*NUM_SAMPLES);
         std::vector<Sample_t> tx_long(resampled_len);                       // Buffer to store the received modulated signal of a single channel
-        InsertSequence(tx_long.data(), tx, FRAME_START, tx_len);
+        InsertSequence(tx_long.data(), tx.data(), FRAME_START, tx.size());
 
         // Processing
         for (unsigned int i = 0; i < resampled_len; ++i) {
