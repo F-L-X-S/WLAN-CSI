@@ -131,7 +131,6 @@ set(SANDBOX_SRC_FILES
   sandbox/example_symsync_get_tau.cc
   sandbox/example_auto_correlation.cc
   sandbox/example_qdsync.cc
-  sandbox/example_ofdm_multisync.cc
   sandbox/example_music.cc
   sandbox/example_usrp.cc
   sandbox/example_usrp_music.cc
