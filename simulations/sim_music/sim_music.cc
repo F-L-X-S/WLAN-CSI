@@ -3,9 +3,23 @@
  * @author Felix Schuelke (flxscode@gmail.com)
  * 
  * @brief 
+ * 
+ * The complex baseband signal is resampled to match the NCO steps. 
+ * -> Resampling-factor is 2*PI*CARRIER_FREQUENCY/M 
+ * -> One sample of the modulated signal corresponds to a time step of 1/(2*PI*CARRIER_FREQUENCY)
+ * -> SAMPLE_RATE = 2*PI*CARRIER_FREQUENCY
+ * 
+ * Time-delay (DDELAY) between neighboring antennas in ULA with lambda/2 spacing: 
+ * tau [seconds]=sin(theta)/(2*f [Hz])
+ * -> DDELAY [Samples] = tau [seconds] * (SAMPLE_RATE) 
+ * -> DDELAY [Samples] = sin(theta)/(2*CARRIER_FREQUENCY) * (2*PI*CARRIER_FREQUENCY)=PI*sin(theta)
+ * e.g. theta=45°,  CARRIER_FREQUENCY = 7718.4  
+ *      tau = sin(45°)/(2*7718.4) = 4.5807e-05 seconds
+ *      DDELAY = 4.5807e-05s * 2*PI*7718.4 = 2.22144 samples
+ *      -> DDELAY = PI*sin(45°) = 2.22144 samples
+ * 
  * @version 0.1
  * @date 2025-08-19
- * 
  * 
  */
 
@@ -25,15 +39,15 @@
 #define SYMBOLS_PER_FRAME 3         // Number of data-symbols transmitted per frame
 #define FRAME_START 30              // Start position of the ofdm-frame in the sequence
 #define NUM_CHANNELS 4              // Number of simulated channels 
- #define CARRIER_FREQUENCY 7718.4f  // 2.412GHz/20MHz = 120.6, 64 * 120.6 = 7718.4 DFT-points in 2.412GHz domain
+#define CARRIER_FREQUENCY 7718.4f   // Carrier Frequency [Hz]
 
 // Definition of the channel impairments
 #define NOISE_FLOOR -90.0f          // Noise floor (dB) 
 #define SNR_DB 40.0f                // Signal-to-noise ratio (dB) 
 #define CARRIER_FREQ_OFFSET 0.0f    // Carrier frequency offset (radians per sample)
-#define CARRIER_PHASE_OFFSET 0.0    // Phase offset (radians) 
-#define DELAY 10.0f                 // Time-delay (samples)
-#define DDELAY 2.22144f             // Differential Delay between receiving channels (samples)
+#define CARRIER_PHASE_OFFSET 0.0f   // Phase offset (radians) 
+#define DELAY 1.00f                 // Time-delay [Samples]
+#define DDELAY 2.22144f             // Differential Delay between receiving channels [Samples] (PI*sin(45°))
 
 // Output file in MATLAB-format to store results
 #define OUTFILE "simulations/sim_music/sim_music.m" 
@@ -135,18 +149,16 @@ int main(int argc, char*argv[])
     // Destroy frame generator
     ofdmframegen_destroy(fg);
 
-    // ------------------- Upconversion ---------------------
-    // Resampling rate = 2*pi*carrier/baseband
-    float r = (float)(2*M_PI*CARRIER_FREQUENCY/(M));
-
-    // Resample signal to match carrier
-    std::vector<Sample_t> tx((unsigned int)(frame_samples*ceil(r)));    // Resampled signal buffer
+    // ------------------- Resampling ---------------------
+    float r = (float)(2*M_PI*CARRIER_FREQUENCY/(M));                    // Resampling factor
+    std::vector<Sample_t> tx((unsigned int)(frame_samples*ceil(r)*2));  // Resampled signal buffer
     msresamp_crcf resamp_tx = msresamp_crcf_create(r,60.0);
     unsigned int ny;
     msresamp_crcf_execute(resamp_tx, tx_base.data(), tx_base.size(), tx.data(), &ny);
     msresamp_crcf_destroy(resamp_tx);
+    tx.resize(ny);                                                      // Resize the buffer to the actual number of samples written
 
-    // Mix Up 
+    // ------------------- Upconversion ---------------------
     nco_crcf nco_tx = nco_crcf_create(LIQUID_NCO);
     nco_crcf_set_frequency(nco_tx, 2*M_PI*CARRIER_FREQUENCY);
     nco_crcf_mix_block_up(nco_tx, tx.data(), tx.data(), tx.size());
@@ -220,11 +232,9 @@ int main(int argc, char*argv[])
     // Create multi frame synchronizer
     MultiSync<ofdmframesync> ms(NUM_CHANNELS, {M, cp_len, taper_len, p}, callback, userdata);
 
-    // Channel frequency response (CFR) and channel impulse response (CIR)
+    // Channel frequency response (CFR) 
     std::vector<std::vector<Sample_t>> cfr(NUM_CHANNELS);   // Multidimensional buffer to store the cfr for all channels
-    std::vector<std::vector<Sample_t>> cir(NUM_CHANNELS);   // Multidimensional buffer to store the cir for all channels
     cfr.assign(NUM_CHANNELS, std::vector<Sample_t>(M, Sample_t(0.0f, 0.0f)));   // Initialize the buffer with zeros
-    cir.assign(NUM_CHANNELS, std::vector<Sample_t>(M, Sample_t(0.0f, 0.0f)));   // Initialize the buffer with zeros
 
     // Samplewise synchronization of each channel (MultiSync processes whole buffer, in this case we want to limit the buffer to only one sample)
     std::vector<std::complex<float>> rx_sample(1);          // Buffer to hold current sample for sample-by-sample processing
@@ -256,7 +266,7 @@ int main(int argc, char*argv[])
 
         m_file.Add(rx_base[ch], "x_" + ch_suffix)                   // Add received signal to MATLAB file  
             .Add(cb_data[ch].buffer, "datasymbols_" + ch_suffix)    // Add detected symbols to MATLAB file
-            .Add(cb_data[ch].cfr, "cfr_" + ch_suffix);              // Add estimated CFR to MATLAB file
+            .Add(cfr[ch], "cfr_" + ch_suffix);                      // Add estimated CFR to MATLAB file
     }
 
     // Initialize legend labels
