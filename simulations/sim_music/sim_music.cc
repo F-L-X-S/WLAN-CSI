@@ -41,6 +41,10 @@
 // ZMQ-socket for data export to MUSIC running in Python-application
 #define EXPORT_INTERFACE 'tcp://localhost:5555' 
 
+// Python-Application with MUSIC algorithm for DoA estimation
+#define PYTHONPATH "./music/env/bin/python"
+#define MUSIC_PYFILE "./music/music-spectrum.py"               
+
 // Sample type
 using Sample_t = std::complex<float>; 
 
@@ -72,6 +76,10 @@ return 0;
 // main function
 int main(int argc, char*argv[])
 {
+    // Run spectral MUSIC DoA algorithm
+    std::string cmd = std::string(PYTHONPATH) + ' ' + std::string(MUSIC_PYFILE)+"&";
+    system(cmd.c_str());
+
     // ---------------------- Signal Generation ----------------------
     // options
     unsigned int M           = 64;      // number of subcarriers 
