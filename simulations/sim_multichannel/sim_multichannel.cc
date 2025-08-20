@@ -29,7 +29,8 @@
  * -> |H_k| = [|X_k|/|S_k|]* M = (4.4721e-04 / 1)* 64 = 0.0286 
  * 
  * Expected CFR phase on subcarrier k (CFR estimated after LTF detected): 
- * in complex baseband for M subcarriers, M+CP samples are transmitted in time-domain -> normalized SampleRate = 1/(M+CP) = 1/(64+16) = 0.0125
+ * in complex baseband for M subcarriers, M+CP samples are transmitted in time-domain 
+ * -> Samplerate normalized to symbol-length:  normalized SampleRate = 1/(M+CP) = 1/(64+16) = 0.0125
  * normalized subcarrier freq. spacing in complex baseband domain: df = SampleRate / M = 0.0125/64 = 1.9531e-04
  * dphi_k = 2 * pi * f_k * tau = 2pi * k * df * tau (phase shift on subcarrier k due to time-delay tau)
  * 
