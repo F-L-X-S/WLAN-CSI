@@ -4,22 +4,22 @@
  * 
  * @brief 
  * 
- * CARRIER_FREQUENCY is chosen proportional to WLAN Channel 1 but for frequency-spacing of 1: 
- * 2.412GHz/20MHz = 120.6, 64 * 120.6 = 7718.4 
+ * Define SAMPLE_RATE to set the time-base for the complex-baseband signal.
+ * -> One simulated baseband or modulated sample corresponds to a time step of 1/SAMPLE_RATE seconds
+ * ->n-th sample is at t = n/SAMPLE_RATE
  * 
- * The complex baseband signal is resampled to match the NCO steps. 
- * -> Resampling-factor is 2*PI*CARRIER_FREQUENCY/M 
- * -> One sample of the modulated signal corresponds to a time step of 1/(2*PI*CARRIER_FREQUENCY)
- * -> SAMPLE_RATE = 2*PI*CARRIER_FREQUENCY
+ * Modulation of each n-th sample x[n] with NCO (Numerically Controlled Oscillator):
+ *  Analog Carrier Signal: exp(j*2*pi*CARRIER_FREQUENCY*t + phi)
+ *  -> Upconversion tx[n] = tx[n]*exp(j*2*pi*CARRIER_FREQUENCY*n/SAMPLE_RATE)
+ *  -> Downconversion rx[n] = rx[n]*exp(-j*2*pi*CARRIER_FREQUENCY*n/SAMPLE_RATE + j*CARRIER_PHASE_OFFSET)
  * 
  * Time-delay (DDELAY) between neighboring antennas in ULA with lambda/2 spacing: 
- * tau [seconds]=sin(theta)/(2*f [Hz])
- * -> DDELAY [Samples] = tau [seconds] * (SAMPLE_RATE) 
- * -> DDELAY [Samples] = sin(theta)/(2*CARRIER_FREQUENCY) * (2*PI*CARRIER_FREQUENCY)=PI*sin(theta)
- * e.g. theta=45°,  CARRIER_FREQUENCY = 7718.4  
- *      tau = sin(45°)/(2*7718.4) = 4.5807e-05 seconds
- *      DDELAY = 4.5807e-05s * 2*PI*7718.4 = 2.22144 samples
- *      -> DDELAY = PI*sin(45°) = 2.22144 samples
+ * -> tau [seconds]=sin(theta)/(2*f [Hz])
+ * -> DDELAY [Samples] = tau [seconds] * SAMPLE_RATE = 0.5*sin(theta)*SAMPLE_RATE/CARRIER_FREQUENCY
+ * 
+ * e.g. theta=45°,  CARRIER_FREQUENCY = 6.0e5, SAMPLE_RATE = 3.84e6
+ *      tau = sin(45°)/(2*6.0e5 Hz) = 5.8926e-05 seconds
+ *      -> DDELAY = 5.8926e-05 seconds * 3.84e6 *  = 2.2627 samples
  * 
  * @version 0.1
  * @date 2025-08-19
@@ -42,15 +42,16 @@
 #define SYMBOLS_PER_FRAME 3         // Number of data-symbols transmitted per frame
 #define FRAME_START 30              // Start position of the ofdm-frame in the sequence
 #define NUM_CHANNELS 4              // Number of simulated channels 
-#define CARRIER_FREQUENCY 7718.4f   // Carrier Frequency [Hz]
+#define SAMPLE_RATE 3.84e6f         // Sample rate [Hz] 
+#define CARRIER_FREQUENCY 6.0e5f    // Carrier Frequency [Hz]
 
 // Definition of the channel impairments
 #define NOISE_FLOOR -90.0f          // Noise floor (dB) 
 #define SNR_DB 40.0f                // Signal-to-noise ratio (dB) 
 #define CARRIER_FREQ_OFFSET 0.0f    // Carrier frequency offset (radians per sample)
 #define CARRIER_PHASE_OFFSET 0.0f   // Phase offset (radians) 
-#define DELAY 1.00f                 // Time-delay [Samples]
-#define DDELAY 2.22144f             // Differential Delay between receiving channels [Samples] (PI*sin(45°))
+#define DELAY 10.00f                 // Time-delay [Samples]
+#define DDELAY 2.2627f               // Differential Delay between receiving channels [Samples] (PI*sin(45°))
 
 // Output file in MATLAB-format to store results
 #define OUTFILE "simulations/sim_music/sim_music.m" 
@@ -116,19 +117,19 @@ int main(int argc, char*argv[])
     // create frame generator
     ofdmframegen fg = ofdmframegen_create(M, cp_len, taper_len, p);
 
-    std::vector<Sample_t> tx_base(frame_samples);     // Complex baseband signal buffer (transmitted sequence)
+    std::vector<Sample_t> tx(frame_samples);     // Complex baseband signal buffer (transmitted sequence)
     unsigned int n=0;                                 // Number of generated time-domain baseband samples 
 
     // write first S0 symbol
-    ofdmframegen_write_S0a(fg, &tx_base[n]);
+    ofdmframegen_write_S0a(fg, &tx[n]);
     n += frame_len;
 
     // write second S0 symbol
-    ofdmframegen_write_S0b(fg, &tx_base[n]);
+    ofdmframegen_write_S0b(fg, &tx[n]);
     n += frame_len;
 
     // write S1 symbol
-    ofdmframegen_write_S1( fg, &tx_base[n]);
+    ofdmframegen_write_S1( fg, &tx[n]);
     n += frame_len;
 
     // modulate data subcarriers
@@ -145,25 +146,16 @@ int main(int argc, char*argv[])
         }
 
         // Append OFDM symbol to time-domain complex baseband signal 
-        ofdmframegen_writesymbol(fg, X.data(), &tx_base[n]);
+        ofdmframegen_writesymbol(fg, X.data(), &tx[n]);
         n += frame_len;
     }
 
     // Destroy frame generator
     ofdmframegen_destroy(fg);
 
-    // ------------------- Resampling ---------------------
-    float r = (float)(2*M_PI*CARRIER_FREQUENCY/(M));                    // Resampling factor
-    std::vector<Sample_t> tx((unsigned int)(frame_samples*ceil(r)*2));  // Resampled signal buffer
-    msresamp_crcf resamp_tx = msresamp_crcf_create(r,60.0);
-    unsigned int ny;
-    msresamp_crcf_execute(resamp_tx, tx_base.data(), tx_base.size(), tx.data(), &ny);
-    msresamp_crcf_destroy(resamp_tx);
-    tx.resize(ny);                                                      // Resize the buffer to the actual number of samples written
-
     // ------------------- Upconversion ---------------------
     nco_crcf nco_tx = nco_crcf_create(LIQUID_NCO);
-    nco_crcf_set_frequency(nco_tx, 2*M_PI*CARRIER_FREQUENCY);
+    nco_crcf_set_frequency(nco_tx, 2*M_PI*CARRIER_FREQUENCY/SAMPLE_RATE);
     nco_crcf_mix_block_up(nco_tx, tx.data(), tx.data(), tx.size());
     nco_crcf_destroy(nco_tx);                               
 
@@ -177,7 +169,7 @@ int main(int argc, char*argv[])
     unsigned int npfb       =   1000;           // fractional delay resolution
 
     // Initialize buffer to hold the received baseband signals
-    std::vector<std::vector<Sample_t>> rx_base(NUM_CHANNELS, std::vector<Sample_t>(NUM_SAMPLES));           
+    std::vector<std::vector<Sample_t>> rx(NUM_CHANNELS, std::vector<Sample_t>(NUM_SAMPLES));           
 
     // Apply channel to the generated signal
     for (unsigned int ch = 0; ch < NUM_CHANNELS; ++ch) {
@@ -192,37 +184,29 @@ int main(int argc, char*argv[])
 
         // Configure Downconversion to complex baseband
         nco_crcf nco_rx = nco_crcf_create(LIQUID_NCO);
-        nco_crcf_set_frequency(nco_rx, 2*M_PI*CARRIER_FREQUENCY+CARRIER_FREQ_OFFSET);
+        nco_crcf_set_frequency(nco_rx, CARRIER_FREQ_OFFSET + 2*M_PI*(CARRIER_FREQUENCY/SAMPLE_RATE));
         nco_crcf_set_phase(nco_rx, CARRIER_PHASE_OFFSET);
 
         // Insert the baseband-sequence into the longer sequence at the specified start position 'TF_SYMBOL_START' 
-        unsigned int resampled_len = (unsigned int)ceil(r*NUM_SAMPLES);
-        std::vector<Sample_t> tx_long(resampled_len);                       // Buffer to store the received modulated signal of a single channel
-        InsertSequence(tx_long.data(), tx.data(), FRAME_START, tx.size());
+        InsertSequence(rx[ch].data(), tx.data(), FRAME_START, tx.size());
 
         // Processing
-        for (unsigned int i = 0; i < resampled_len; ++i) {
-            fdelay_crcf_push(fd, tx_long[i]);
-            fdelay_crcf_execute(fd, &tx_long[i]);                           // Apply Timedelay
-            channel_cccf_execute(channel, tx_long[i], &tx_long[i]);         // Apply channel impairments 
-            nco_crcf_mix_down(nco_rx, tx_long[i], &tx_long[i]);             // Apply Downconversion 
-            nco_crcf_step(nco_rx);                                          // Step Carrier NCO
+        for (unsigned int i = 0; i < NUM_SAMPLES; ++i) {
+            fdelay_crcf_push(fd, rx[ch][i]);
+            fdelay_crcf_execute(fd, &rx[ch][i]);                          // Apply Timedelay
+            channel_cccf_execute(channel, rx[ch][i], &rx[ch][i]);         // Apply channel impairments 
+            nco_crcf_mix_down(nco_rx, rx[ch][i], &rx[ch][i]);             // Apply Downconversion 
+            nco_crcf_step(nco_rx);                                        // Step Carrier NCO
         }
-
-        // Resampling to Baseband
-        msresamp_crcf resamp_rx = msresamp_crcf_create(1/r,60.0);
-        msresamp_crcf_execute(resamp_rx, tx_long.data(), resampled_len, rx_base[ch].data(), &ny); 
 
         // Free Memory 
         fdelay_crcf_destroy(fd);        
         channel_cccf_destroy(channel);
         nco_crcf_destroy(nco_rx);  
-        msresamp_crcf_destroy(resamp_rx); 
     }
 
     // Destroy reference channel 
     channel_cccf_destroy(base_channel);
-
 
     // ----------------- Synchronization ----------------------
     struct callback_data cb_data[NUM_CHANNELS];                 // Callback data buffer 
@@ -236,15 +220,15 @@ int main(int argc, char*argv[])
     MultiSync<ofdmframesync> ms(NUM_CHANNELS, {M, cp_len, taper_len, p}, callback, userdata);
 
     // Channel frequency response (CFR) 
-    std::vector<std::vector<Sample_t>> cfr(NUM_CHANNELS);   // Multidimensional buffer to store the cfr for all channels
+    std::vector<std::vector<Sample_t>> cfr(NUM_CHANNELS);                       // Multidimensional buffer to store the cfr for all channels
     cfr.assign(NUM_CHANNELS, std::vector<Sample_t>(M, Sample_t(0.0f, 0.0f)));   // Initialize the buffer with zeros
 
     // Samplewise synchronization of each channel (MultiSync processes whole buffer, in this case we want to limit the buffer to only one sample)
-    std::vector<std::complex<float>> rx_sample(1);          // Buffer to hold current sample for sample-by-sample processing
+    std::vector<std::complex<float>> rx_sample(1);                              // Buffer to hold current sample for sample-by-sample processing
     for (unsigned int i = 0; i < NUM_SAMPLES; ++i) {
         for (unsigned int j = 0; j < NUM_CHANNELS; ++j){
             // execute the respective synchronizer
-            rx_sample[0]= rx_base[j][i];             
+            rx_sample[0]= rx[j][i];             
             ms.Execute(j, &rx_sample);
 
             // Store the CFR of all channels (only once)
@@ -267,7 +251,7 @@ int main(int argc, char*argv[])
     for (unsigned int ch = 0; ch < NUM_CHANNELS; ++ch) {
         std::string ch_suffix = std::to_string(ch);
 
-        m_file.Add(rx_base[ch], "x_" + ch_suffix)                   // Add received signal to MATLAB file  
+        m_file.Add(rx[ch], "x_" + ch_suffix)                        // Add received signal to MATLAB file  
             .Add(cb_data[ch].buffer, "datasymbols_" + ch_suffix)    // Add detected symbols to MATLAB file
             .Add(cfr[ch], "cfr_" + ch_suffix);                      // Add estimated CFR to MATLAB file
     }
