@@ -4,22 +4,53 @@
  * 
  * @brief 
  * 
- * Define SAMPLE_RATE to set the time-base for the complex-baseband signal.
- * -> One simulated baseband or modulated sample corresponds to a time step of 1/SAMPLE_RATE seconds
- * ->n-th sample is at t = n/SAMPLE_RATE
+ * Signal Parameters:
+ *      Noise Floor: -90 dB (1e-9 W)
+ *      Signal-to-Noise Ratio (SNR): 40 dB (10e3) 
+ *      => Signal power |X|^2 = 40dB-90dB = -50 dB (1e-5W = 1e-9W * 10e3) 
  * 
- * Modulation of each n-th sample x[n] with NCO (Numerically Controlled Oscillator):
- *  Analog Carrier Signal: exp(j*2*pi*CARRIER_FREQUENCY*t + phi)
- *  -> Upconversion tx[n] = tx[n]*exp(j*2*pi*CARRIER_FREQUENCY*n/SAMPLE_RATE)
- *  -> Downconversion rx[n] = rx[n]*exp(-j*2*pi*CARRIER_FREQUENCY*n/SAMPLE_RATE + j*CARRIER_PHASE_OFFSET)
+ *      SAMPLE_RATE to set the time-base for the signal.
+ *          -> One simulated baseband or modulated sample corresponds to a time step of 1/SAMPLE_RATE seconds
+ *          ->n-th sample is at t = n/SAMPLE_RATE
  * 
- * Time-delay (DDELAY) between neighboring antennas in ULA with lambda/2 spacing: 
- * -> tau [seconds]=sin(theta)/(2*f [Hz])
- * -> DDELAY [Samples] = tau [seconds] * SAMPLE_RATE = 0.5*sin(theta)*SAMPLE_RATE/CARRIER_FREQUENCY
+ *      CARRIER_FREQUENCY:
+ *          Modulation of each n-th sample x[n] with NCO (Numerically Controlled Oscillator):
+ *              Analog Carrier Signal: exp(j*2*pi*CARRIER_FREQUENCY*t + phi)
+ *              -> Upconversion tx[n] = tx[n]*exp(j*2*pi*CARRIER_FREQUENCY*n/SAMPLE_RATE)
+ *              -> Downconversion rx[n] = rx[n]*exp(-j*2*pi*CARRIER_FREQUENCY*n/SAMPLE_RATE + j*CARRIER_PHASE_OFFSET)
+ * 
+ * OFDM Parameters: 
+ * M (Number of subcarriers): 64
+ * M_pilot (Number of pilot subcarriers): 6
+ * M_data (Number of data subcarriers): 44
+ * M_S0 (Number of enabled subcarriers in S0 (STF)): 24 (Note, that Liquid enables every second subcarrier in S0 -> differs e.g. from the IEEE 802.11 standard)
+ * M_S1 (Number of enabled subcarriers in S1 (LTF)): 50
+ * CP length: 16 
+ * 
+ * CFR gain on k-th subcarrier |H_k|: 
+ *          |S|=1  (training symbols S on subcarrier k defined with amplitude 1)
+ *          |X_k|^2 = (|X|^2)/(M_pilot+M_data) = 1e-5W / 50 = 2.0000e-07 W (Signal power on subcarrier k)
+ *          |X_k|= sqrt(2.0000e-07 W) = 4.4721e-04 V (Signal amplitude on subcarrier k)
+ * 
+ *          CFR gain on subcarrier k (|H_k|) is defined as the ratio of the signal amplitude on subcarrier k X_k to the amplitude of the training symbol S_k,
+ *          but FFT is normalized on subcarriers in Liquid-DSP -> multiply by M to get the expected CFR gain given by the synchronizer:
+ *          -> |H_k| = [|X_k|/|S_k|]* M = (4.4721e-04 / 1)* 64 = 0.0286 
+ * 
+ * CFR phase on k-th subcarrier dphi_k: 
+ *          Subcarrier freq. spacing: df = SAMPLE_RATE / M 
+ *          Subcarrier frequency: f_k = CARRIER_FREQUENCY + k * df
+ *          Time-delay: tau [seconds] = Tau [samples]*(1/SAMPLE_RATE)
+ *          Phase shift on subcarrier k due to time-delay tau [seconds]: dphi_k = 2 * pi * f_k * tau 
+ *              dphi_k = 2*pi*(CARRIER_FREQUENCY + k*SAMPLE_RATE/M)*Tau/SAMPLE_RATE
+ * 
+ * 
+ * Time-delay Tau (DDELAY) between neighboring antennas in ULA with lambda/2 spacing (lambda for CARRIER_FREQUENCY): 
+ *      -> tau [seconds]=sin(theta)/(2*CARRIER_FREQUENCY)
+ *      -> Tau [samples] = tau [seconds] * SAMPLE_RATE = 0.5*sin(theta)*SAMPLE_RATE/CARRIER_FREQUENCY
  * 
  * e.g. theta=45°,  CARRIER_FREQUENCY = 6.0e5, SAMPLE_RATE = 3.84e6
- *      tau = sin(45°)/(2*6.0e5 Hz) = 5.8926e-05 seconds
- *      -> DDELAY = 5.8926e-05 seconds * 3.84e6 *  = 2.2627 samples
+ *      -> tau [seconds] = sin(45°)/(2*6.0e5 Hz) = 5.8926e-05 seconds
+ *      -> Tau [samples] = 5.8926e-05 seconds * 3.84e6 *  = 2.2627 samples
  * 
  * @version 0.1
  * @date 2025-08-19
@@ -50,8 +81,8 @@
 #define SNR_DB 40.0f                // Signal-to-noise ratio (dB) 
 #define CARRIER_FREQ_OFFSET 0.0f    // Carrier frequency offset (radians per sample)
 #define CARRIER_PHASE_OFFSET 0.0f   // Phase offset (radians) 
-#define DELAY 10.00f                 // Time-delay [Samples]
-#define DDELAY 2.2627f               // Differential Delay between receiving channels [Samples] (PI*sin(45°))
+#define DELAY 2.2627f                 // Time-delay [Samples]
+#define DDELAY 2.2627f              // Differential Delay between receiving channels [Samples] 
 
 // Output file in MATLAB-format to store results
 #define OUTFILE "simulations/sim_music/sim_music.m" 
