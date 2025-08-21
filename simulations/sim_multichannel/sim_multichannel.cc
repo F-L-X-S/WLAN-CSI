@@ -7,6 +7,7 @@
  * https://github.com/jgaeddert/liquid-dsp (Copyright (c) 2007 - 2016 Joseph Gaeddert).
  * 
  * Signal Parameters:
+ * SampleRate: 1 
  * Noise Floor: -90 dB (1e-9 W)
  * Signal-to-Noise Ratio (SNR): 40 dB (10e3) 
  * => Signal power |X|^2 = 40dB-90dB = -50 dB (1e-5W = 1e-9W * 10e3) 
@@ -26,26 +27,28 @@
  * 
  * CFR gain on subcarrier k (|H_k|) is defined as the ratio of the signal amplitude on subcarrier k X_k to the amplitude of the training symbol S_k,
  * but FFT is normalized on subcarriers in Liquid-DSP -> multiply by M to get the expected CFR gain given by the synchronizer:
- * -> |H_k| = [|X_k|/|S_k|]* M = (4.4721e-04 / 1)* 64 = 0.0286 
+ *      -> |H_k| = [|X_k|/|S_k|]* M = (4.4721e-04 / 1)* 64 = 0.0286 
  * 
  * Expected CFR phase on subcarrier k (CFR estimated after LTF detected): 
- * in complex baseband for M subcarriers, M+CP samples are transmitted in time-domain 
- * -> Samplerate normalized to symbol-length:  normalized SampleRate = 1/(M+CP) = 1/(64+16) = 0.0125
- * normalized subcarrier freq. spacing in complex baseband domain: df = SampleRate / M = 0.0125/64 = 1.9531e-04
- * dphi_k = 2 * pi * f_k * tau = 2pi * k * df * tau (phase shift on subcarrier k due to time-delay tau)
+ *          -> subcarrier freq. spacing: df = SampleRate / M = 1/64 
+ *      No carier-modulation: 
+ *          -> f_k = k * df = k / M
+ *      Time-delay tau [seconds] = tau [samples]*(1/SampleRate)
+ *          -> for SampleRate = 1, tau [samples] = tau [seconds]
+ *      Phase shift on subcarrier k due to time-delay tau:
+ *          -> dphi_k = 2 * pi * f_k * tau = 2pi * (k/M) * tau 
  * 
  * e.g. DELAY = 0.1 samples, DDELAY = 0.1 samples 
  *      -> total delay: CH0: 0.1 samples, CH1: 0.2 samples, CH2: 0.3 samples, CH3: 0.4 samples
- *      -> normalized time-delay tau for 0.1 samples: -0.1/sampleRate = -0.1 * (M+CP) = -8
  * 
- *      CH0 (tau=-8)        k=-15:  dphi_-15 = 2*pi * -15 * 1.9531e-04 * -8 = 0.1473 rad
- *                          k=15:   dphi_15 = 2*pi * 15 * 1.9531e-04 * -8 = -0.1473 rad
- *      CH1 (tau=-16)       k=-15:  dphi_-15 = 2*pi * -15 * 1.9531e-04 * -16 = 0.2945 rad
- *                          k=15:   dphi_15 = 2*pi * 15 * 1.9531e-04 * -16 = -0.2945 rad
- *      CH2 (tau=-24)       k=-15:  dphi_-15 = 2*pi * -15 * 1.9531e-04 * -24 = 0.4418 rad
- *                          k=15:   dphi_15 = 2*pi * 15 * 1.9531e-04 * -24 = -0.4418 rad
- *      CH3 (tau=-32)       k=-15:  dphi_-15 = 2*pi * -15 * 1.9531e-04 * -32 = 0.5890 rad
- *                          k=15:   dphi_15 = 2*pi * 15 * 1.9531e-04 * -32 = -0.5890 rad
+ *      CH0 (tau=0.1)       k=-15:  dphi_-15 =  2*pi * -15/64 * -0.1     = 0.1473 rad
+ *                          k=15:   dphi_15 =   2*pi * 15/64 * -0.1      = -0.1473 rad
+ *      CH1 (tau=0.2)       k=-15:  dphi_-15 =  2*pi * -15/64 * -0.2     = 0.2945 rad
+ *                          k=15:   dphi_15 =   2*pi * 15/64 * -0.2      = -0.2945 rad
+ *      CH2 (tau=0.3)       k=-15:  dphi_-15 =  2*pi * -15/64 * -0.3     = 0.4418 rad
+ *                          k=15:   dphi_15 =   2*pi * 15/64 * -0.3      = -0.4418 rad
+ *      CH3 (tau=0.4)       k=-15:  dphi_-15 =  2*pi * -15/64 * -0.4     = 0.5890 rad
+ *                          k=15:   dphi_15 =   2*pi * 15/64 * -0.4      = -0.5890 rad
  * 
  * Note, that the fdelay filter causes phase-distortion on some delay-values. 
  * The predefined values of DELAY and DDELAY are chosen to avoid this distortion.

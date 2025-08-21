@@ -51,48 +51,52 @@ The CFR gain on subcarrier $k$, $|H_k|$, is defined as the ratio of the signal a
 ```
 
 ### Expected Subcarrier Phase
-Since the CFRs phase response is expected to be linear across the enabled frequency band, calculating the phase shift for two subcarriers is sufficient to determine the expected behavior. For the calculations in the complex baseband, a normalized time unit $[T_n]$ equivalent to a single baseband sample time is defined. For $M$ subcarriers, $M+\text{cp}$ samples are transmitted in the time domain, resulting in a normalized sample rate of the baseband sequence of
+Since the CFRs phase response is expected to be linear across the enabled frequency band, calculating the phase shift for two subcarriers is sufficient to determine the expected behavior. For the calculations in the complex baseband, a Sample-rate of $R_s=1 Hz$ is defined. 
+#### Frequency Spacing $_\Delta f$
+$R_s=1 Hz$ results in a subcarrier frequency spacing $_\Delta f$ in the complex baseband domain of
  
 ```math
-R_S = \frac{1}{M+\text{cp}} = \frac{1}{64+16} = 0.0125 \quad[T_n^{-1}]
+_\Delta f = \frac{R_S}{M} = \frac{1}{64} \quad[Hz]
 ```
- 
-This results in a normalized subcarrier frequency spacing $\Delta f_n$ in the complex baseband domain of
- 
+#### Time-Delay $\tau$ in $[seconds]$
+For $R_S=1Hz$, a time-delay of $\Tau$ in $[samples]$ results in a delay $\tau$ in $[s]$ as
 ```math
-\Delta f_n = \frac{R_S}{M} = \frac{0.0125}{64} = 1.9531 \times 10^{-4}  \quad[T_n^{-1}]
+\tau=\Tau*\frac{1}{R_s} \qquad\to\quad \tau\quad[seconds]=\Tau\quad[samples]
+```
+Considering a ```DELAY``` of $0.1$ samples and a ```DDELAY``` of $0.1$ samples applied to the fractional delay filter results in channel delays in multiples of $0.1$ samples. 
+
+#### Subcarrier-Frequency $f_k$
+Since no carrier modulation is performed, the total frequency $f_k$ at subcarrier $k$ is given by
+```math
+f_k = k*_\Delta f = \frac{k}{M}
+```
+#### Subcarrier CFR Phase $_\Delta\phi_k$
+An impinging wave is received at phase $\phi=2\pi f \tau$ after $\tau$ seconds. The expected training-symbols phase sets the reference as $\phi=0$, the phase-shift $_\Delta f_k$ at subcarrier $k$ is then given as 
+```math
+_\Delta \phi_k=2\pi*f_k*\tau=2\pi*\frac{k}{M}*\Tau
 ```
 
-Considering a ```DELAY``` of $0.1$ samples and a ```DDELAY``` of $0.1$ samples applied to the fractional delay filter results in channel delays in multiples of $0.1$ samples. 
-Example calculation of the expected phase shift for  Channel 0:
-The normalized time delay for Channel 0 is
- 
+#### Example calculation of the expected phase shift for  Channel 0 
+At two representative subcarriers at $k = \pm 15$:  
 ```math
-\tau_n = -0.1 / R_S = -0.1 * (M+\text{cp}) = -8 \quad[T_n]
-```
- 
-For two representative subcarriers at $k = \pm 15$, the resulting phase $\Delta\phi=2\pi f \tau$ for Channel 0 is given by
- 
-```math
-\Delta\phi_{-15} = 2\pi \cdot (-15) \cdot 1.9531 \times 10^{-4} \cdot (-8) = 0.1473\,\mathrm{rad}
+\Delta\phi_{-15} = 2\pi \cdot \frac{-15}{64}\cdot*(-0.1) = 0.1473\,\mathrm{rad}
 ```
  
 ```math
-\Delta\phi_{15} = 2\pi \cdot 15 \cdot 1.9531 \times 10^{-4} \cdot (-8) = -0.1473\,\mathrm{rad}
+\Delta\phi_{+15} = 2\pi \cdot \frac{15}{64}\cdot*(-0.1) = -0.1473\,\mathrm{rad}
 ```
 
 The corresponding expected phase shifts calculated for the remaining channels:
 |                       | Channel 0 | Channel 1 | Channel 2 | Channel 3 |
 |-----------------------|-----------|-----------|-----------|-----------|
 | Delay $[Samples]$     | 0.1       | 0.2       | 0.3       | 0.4       |
-| Delay $[T_n]$          | -8        | -16       | -24       | -32       |
 | $\Delta\phi_{-15}\quad [rad]$      | 0.1473    | 0.2945    | 0.4418    | 0.5890    |
 | $\Delta\phi_{15} \quad [rad]$         | -0.1473   | -0.2945   | -0.4418   | -0.5890   |
 
 Consequently, the CFR for the shown simulation parameters is expected to show an equal subcarrier gain of $|H_k|=0.0286$ for all $M_{data}+M_{pilot}$ subcarriers in the transmission bandwidth and a linear phase shift that intersects $\Delta\phi_{-15}$ and $\Delta\phi_{15}$. 
 
 
-It should be noted that the fractional delay filter ```fdelay_crcf``` causes phase-distortion for certain delay values, resulting in unexpected phase-offsets in the CFR. The delays shown in Table \ref{fig:sim_multichannel_phases} are chosen to avoid this distortion.
+It should be noted that the fractional delay filter ```fdelay_crcf``` causes phase-distortion for certain delay values, resulting in unexpected phase-offsets in the CFR. The delays are chosen to avoid this distortion.
 
 ### Generated baseband sequences with the specified channel impairments
 <img src="https://raw.githubusercontent.com/F-L-X-S/doa4rfc/refs/heads/main/docs/assets/sim_multichannel/sim_multichannel_signal.svg" alt="sim_multichannel_signal.svg" style="width:90%;">
