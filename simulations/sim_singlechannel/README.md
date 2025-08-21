@@ -80,11 +80,11 @@ _\Delta \phi_k=2\pi*f_k*\tau=2\pi*\frac{k}{M}*\Tau
 #### Expected Subcarrier Phase Calculation
 At two representative subcarriers at $k = \pm 15$:  
 ```math
-\Delta\phi_{-15} = 2\pi \cdot \frac{-15}{64}\cdot*(-0.5) = 0.7363\,\mathrm{rad}
+\Delta\phi_{-15} = 2\pi \cdot \frac{-15}{64}\cdot(-0.5) = 0.7363\,\mathrm{rad}
 ```
  
 ```math
-\Delta\phi_{+15} = 2\pi \cdot \frac{15}{64}\cdot*(-0.5) = -0.7363\,\mathrm{rad}
+\Delta\phi_{+15} = 2\pi \cdot \frac{15}{64}\cdot(-0.5) = -0.7363\,\mathrm{rad}
 ```
 
 The CFR for the shown simulation parameters is expected to show an equal subcarrier gain of $|H_k|=0.0286$ for all $M_{data}+M_{pilot}$ subcarriers in the transmission bandwidth and a linear phase shift that intersects $\Delta\phi_{-15}$ and $\Delta\phi_{15}$. 
