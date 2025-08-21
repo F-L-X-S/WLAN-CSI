@@ -20,23 +20,24 @@
  * M_S1 (Number of enabled subcarriers in S1 (LTF)): 50
  * CP length: 16 
  * 
- * Expected CFR gain on subcarrier k (CFR estimated after LTF detected): 
- * |S|=1  (training symbols S on subcarrier k defined with amplitude 1)
- * |X_k|^2 = (|X|^2)/(M_pilot+M_data) = 1e-5W / 50 = 2.0000e-07 W (Signal power on subcarrier k)
- * |X_k|= sqrt(2.0000e-07 W) = 4.4721e-04 V (Signal amplitude on subcarrier k)
+ * CFR gain on k-th subcarrier |H_k|: 
+ *          |S|=1  (training symbols S on subcarrier k defined with amplitude 1)
+ *          |X_k|^2 = (|X|^2)/(M_pilot+M_data) = 1e-5W / 50 = 2.0000e-07 W (Signal power on subcarrier k)
+ *          |X_k|= sqrt(2.0000e-07 W) = 4.4721e-04 V (Signal amplitude on subcarrier k)
  * 
- * CFR gain on subcarrier k (|H_k|) is defined as the ratio of the signal amplitude on subcarrier k X_k to the amplitude of the training symbol S_k,
- * but FFT is normalized on subcarriers in Liquid-DSP -> multiply by M to get the expected CFR gain given by the synchronizer:
- *      -> |H_k| = [|X_k|/|S_k|]* M = (4.4721e-04 / 1)* 64 = 0.0286 
+ *          CFR gain on subcarrier k (|H_k|) is defined as the ratio of the signal amplitude on subcarrier k X_k to the amplitude of the training symbol S_k,
+ *          but FFT is normalized on subcarriers in Liquid-DSP -> multiply by M to get the expected CFR gain given by the synchronizer:
+ *          -> |H_k| = [|X_k|/|S_k|]* M = (4.4721e-04 / 1)* 64 = 0.0286 
  * 
- * Expected CFR phase on subcarrier k (CFR estimated after LTF detected): 
- *          -> subcarrier freq. spacing: df = SampleRate / M = 1/64 
- *      No carier-modulation: 
- *          -> f_k = k * df = k / M
- *      Time-delay tau [seconds] = tau [samples]*(1/SampleRate)
- *          -> for SampleRate = 1, tau [samples] = tau [seconds]
- *      Phase shift on subcarrier k due to time-delay tau:
- *          -> dphi_k = 2 * pi * f_k * tau = 2pi * (k/M) * tau 
+ * CFR phase on k-th subcarrier dphi_k: 
+ *          Subcarrier freq. spacing: df = SampleRate / M 
+ *              -> For M=64 and SampleRate =1: df = 1/64 
+ *          Subcarrier frequency: f_k = f_c + k * df
+ *              -> For f_c = 0 (no carrier-modulation): f_k = k * df = k / M
+ *          Time-delay: tau [seconds] = Tau [samples]*(1/SampleRate)
+ *              -> For SampleRate = 1, tau [samples] = tau [seconds]
+ *          Phase shift on subcarrier k due to time-delay tau [seconds]: dphi_k = 2 * pi * f_k * tau = 2*pi*(f_c + k*df)*tau
+ *              -> For f_c=0, SampleRate = 1:  dphi_k = 2pi * (k/M) * Tau 
  * 
  * e.g. DELAY = 0.1 samples, DDELAY = 0.1 samples 
  *      -> total delay: CH0: 0.1 samples, CH1: 0.2 samples, CH2: 0.3 samples, CH3: 0.4 samples
