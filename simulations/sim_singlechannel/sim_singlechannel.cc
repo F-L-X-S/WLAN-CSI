@@ -13,6 +13,7 @@
  * https://github.com/jgaeddert/liquid-dsp (Copyright (c) 2007 - 2016 Joseph Gaeddert).
  * 
  * Signal Parameters:
+ * SampleRate: 1
  * Noise Floor: -90 dB (1e-9 W)
  * Signal-to-Noise Ratio (SNR): 40 dB (10e3) 
  * => Signal power |X|^2 = 40dB-90dB = -50 dB (1e-5W = 1e-9W * 10e3) 
@@ -35,13 +36,17 @@
  * -> |H_k| = [|X_k|/|S_k|]* M = (4.4721e-04 / 1)* 64 = 0.0286 
  * 
  * Expected CFR phase on subcarrier k (CFR estimated after LTF detected): 
- * in complex baseband for M subcarriers, M+CP samples are transmitted in time-domain -> normalized SampleRate = 1/(M+CP) = 1/(64+16) = 0.0125
- * normalized subcarrier freq. spacing in complex baseband domain: df = SampleRate / M = 0.0125/64 = 1.9531e-04
- * dphi_k = 2 * pi * f_k * tau = 2pi * k * df * tau (phase shift on subcarrier k due to time-delay tau)
+ *          -> subcarrier freq. spacing: df = SampleRate / M = 1/64 
+ *      No carier-modulation: 
+ *          -> f_k = k * df = k / M
+ *      Time-delay tau [seconds] = tau [samples]*(1/SampleRate)
+ *          -> for SampleRate = 1, tau [samples] = tau [seconds]
+ *      Phase shift on subcarrier k due to time-delay tau:
+ *          -> dphi_k = 2 * pi * f_k * tau = 2pi * (k/M) * tau 
  * 
- * e.g. DELAY = 0.5 samples -> normalized time-delay tau = -0.5/sampleRate = -0.5 * (M+CP) = -40:
- *      k=-15:  dphi_-15 = 2pi * -15 * 1.9531e-04 * -40 = 0.7363 rad
- *      k=15:   dphi_15 = 2pi * 15 * 1.9531e-04 * -40 = -0.7363 rad
+ * e.g. DELAY = 0.5 samples:
+ *      k=-15:  dphi_-15 =  2*pi * -15/64 * -0.5     = 0.7363 rad
+ *      k=15:   dphi_15 =   2*pi * 15/64 * -0.5      = -0.7363 rad
  * 
  * Note, that the fdelay filter causes phase-distortion on some delay-values. 
  * The predefined values of DELAY and DDELAY are chosen to avoid this distortion.

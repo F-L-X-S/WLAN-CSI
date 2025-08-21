@@ -23,7 +23,7 @@ Chosen simulation parameters:
 | Signal-to-Noise Ratio               | $SNR_{dB}$     | 40 dB  |
 
 
-
+### Expected Subcarrier Gain
 The expected gain on subcarrier $k$ in the CFR estimated after detection of the LTF, is described as follows. The total signal power 
  
  ```math
@@ -49,35 +49,37 @@ The CFR gain on subcarrier $k$, $|H_k|$, is defined as the ratio of the signal a
         = (4.4721 * 10^{-4}) * 64 
         = 0.0286
 ```
+
+### Expected Subcarrier Phase
+Since the CFRs phase response is expected to be linear across the enabled frequency band, calculating the phase shift for two subcarriers is sufficient to determine the expected behavior. For the calculations in the complex baseband, a Sample-rate of $R_s=1 Hz$ is defined. 
  
-Since the CFRs phase response is expected to be linear across the enabled frequency band, calculating the phase shift for two subcarriers is sufficient to determine the expected behavior. For the calculations in the complex baseband, a normalized time unit $[T_n]$ equivalent to a single baseband sample time is defined. For $M$ subcarriers, $M+\text{cp}$ samples are transmitted in the time domain, resulting in a normalized sample rate of the baseband sequence of
- 
+#### Time-Delay $\tau$ in $[seconds]$
+For $R_S=1Hz$, a time-delay of $\Tau$ in $[samples]$ results in a delay $\tau$ in $[s]$ as
 ```math
-R_S = \frac{1}{M+\text{cp}} = \frac{1}{64+16} = 0.0125 \quad[T_n^{-1}]
+\tau=\Tau*\frac{1}{R_s} \qquad\to\quad \tau\quad[seconds]=\Tau\quad[samples]
+```
+
+#### Subcarrier-Frequency $f_k$
+Since no carrier modulation is performed, the total frequency $f_k$ at subcarrier $k$ is given by
+```math
+f_k = k*_\Delta f = \frac{k}{M}
+```
+#### Subcarrier CFR Phase $_\Delta\phi_k$
+An impinging wave is received at phase $\phi=2\pi f \tau$ after $\tau$ seconds. The expected training-symbols phase sets the reference as $\phi=0$, the phase-shift $_\Delta f_k$ at subcarrier $k$ is then given as 
+```math
+_\Delta \phi_k=2\pi*f_k*\tau=2\pi*\frac{k}{M}*\Tau
+```
+
+#### Expected Subcarrier Phase Calculation
+At two representative subcarriers at $k = \pm 15$:  
+```math
+\Delta\phi_{-15} = 2\pi \cdot \frac{-15}{64}\cdot*(-0.5) = 0.7363\,\mathrm{rad}
 ```
  
-This results in a normalized subcarrier frequency spacing $\Delta f_n$ in the complex baseband domain of
- 
 ```math
-\Delta f_n = \frac{R_S}{M} = \frac{0.0125}{64} = 1.9531 \times 10^{-4}  \quad[T_n^{-1}]
+\Delta\phi_{+15} = 2\pi \cdot \frac{15}{64}\cdot*(-0.5) = -0.7363\,\mathrm{rad}
 ```
- 
-Considering a ```DELAY``` of $0.5$ samples applied to the fractional delay filter, the normalized time delay is
- 
-```math
-\tau_n = -0.5 / R_S = -0.5 * (M+\text{cp}) = -40 \quad[T_n]
-```
- 
-For two representative subcarriers at $k = \pm 15$, the resulting phase $\Delta\phi=2\pi f \tau$ is given by
- 
-```math
-\Delta\phi_{-15} = 2\pi \cdot (-15) \cdot 1.9531 \times 10^{-4} \cdot (-40) = 0.7363\,\mathrm{rad}
-```
- 
-```math
-\Delta\phi_{15} = 2\pi \cdot 15 \cdot 1.9531 \times 10^{-4} \cdot (-40) = -0.7363\,\mathrm{rad}
-```
- 
+
 The CFR for the shown simulation parameters is expected to show an equal subcarrier gain of $|H_k|=0.0286$ for all $M_{data}+M_{pilot}$ subcarriers in the transmission bandwidth and a linear phase shift that intersects $\Delta\phi_{-15}$ and $\Delta\phi_{15}$. 
  
 
@@ -90,4 +92,5 @@ The CFR for the shown simulation parameters is expected to show an equal subcarr
 
 ### Detected Datasymbols 
 (only first OFDM symbol)
+
 <img src="https://raw.githubusercontent.com/F-L-X-S/doa4rfc/refs/heads/main/docs/assets/sim_singlechannel/sim_singlechannel_detection.svg" alt="sim_singlechannel_detection.svg" style="width75%;">
