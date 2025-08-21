@@ -52,6 +52,13 @@ The CFR gain on subcarrier $k$, $|H_k|$, is defined as the ratio of the signal a
 
 ### Expected Subcarrier Phase
 Since the CFRs phase response is expected to be linear across the enabled frequency band, calculating the phase shift for two subcarriers is sufficient to determine the expected behavior. For the calculations in the complex baseband, a Sample-rate of $R_s=1 Hz$ is defined. 
+
+#### Frequency Spacing $_\Delta f$
+$R_s=1 Hz$ results in a subcarrier frequency spacing $_\Delta f$ in the complex baseband domain of
+ 
+```math
+_\Delta f = \frac{R_S}{M} = \frac{1}{64} \quad[Hz]
+```
  
 #### Time-Delay $\tau$ in $[seconds]$
 For $R_S=1Hz$, a time-delay of $\Tau$ in $[samples]$ results in a delay $\tau$ in $[s]$ as
