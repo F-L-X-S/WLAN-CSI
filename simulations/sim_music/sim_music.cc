@@ -48,9 +48,17 @@
  *      -> tau [seconds]=sin(theta)/(2*CARRIER_FREQUENCY)
  *      -> Tau [samples] = tau [seconds] * SAMPLE_RATE = 0.5*sin(theta)*SAMPLE_RATE/CARRIER_FREQUENCY
  * 
+ * e.g. theta=60°,  CARRIER_FREQUENCY = 6.0e5, SAMPLE_RATE = 3.84e6
+ *      -> Tau [samples] = sin(60°)/(2*6.0e5) * 3.84e6  = 2.7713 samples
+ * 
  * e.g. theta=45°,  CARRIER_FREQUENCY = 6.0e5, SAMPLE_RATE = 3.84e6
  *      -> tau [seconds] = sin(45°)/(2*6.0e5 Hz) = 5.8926e-05 seconds
  *      -> Tau [samples] = 5.8926e-05 seconds * 3.84e6 *  = 2.2627 samples
+ * 
+ * e.g. theta=30°,  CARRIER_FREQUENCY = 6.0e5, SAMPLE_RATE = 3.84e6
+ *      -> Tau [samples] = sin(30°)/(2*6.0e5) * 3.84e6  = 1.6 samples
+ * 
+ * Note, that an increased basis-delay of approximately DELAY = 10 samples ensures a better performance of the fractional delay filter.
  * 
  * @version 0.1
  * @date 2025-08-19
@@ -81,8 +89,8 @@
 #define SNR_DB 40.0f                // Signal-to-noise ratio (dB) 
 #define CARRIER_FREQ_OFFSET 0.0f    // Carrier frequency offset (radians per sample)
 #define CARRIER_PHASE_OFFSET 0.0f   // Phase offset (radians) 
-#define DELAY 2.2627f                 // Time-delay [Samples]
-#define DDELAY 2.2627f              // Differential Delay between receiving channels [Samples] 
+#define DELAY 10.0f                 // Time-delay [Samples]
+#define DDELAY 1.6f              // Differential Delay between receiving channels [Samples] 
 
 // Output file in MATLAB-format to store results
 #define OUTFILE "simulations/sim_music/sim_music.m" 
