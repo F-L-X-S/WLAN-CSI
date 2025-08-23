@@ -32,6 +32,7 @@ config:
   theme: redux
 ---
 flowchart TD
+FrameGen["Frame Generator"]
 subgraph HardwareInterface["SDR Hardware Interface"]
  subgraph T_StreamWorker["Stream-Worker"]
         UsrpDevices["USRP Device Interface [0..*]"]
@@ -45,7 +46,6 @@ subgraph HardwareInterface["SDR Hardware Interface"]
  subgraph T_TxWorker["TX-Worker [0..*]"]
         TxStream["TX Stream Interface"]
         TxBuffer["TX Buffer"]
-        FrameGen["Frame Generator"]
   end
 end
  subgraph T_SyncWorker["Sync-Worker"]
