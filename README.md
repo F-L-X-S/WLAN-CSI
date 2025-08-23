@@ -29,9 +29,10 @@ This project aims to provide a flexible software architecture, to implement and 
 config:
   look: classic
   layout: elk
-  theme: dark
+  theme: redux
 ---
 flowchart TD
+subgraph HardwareInterface["SDR Hardware Interface"]
  subgraph T_StreamWorker["Stream-Worker"]
         UsrpDevices["USRP Device Interface [0..*]"]
         UsrpConf["USRP Interface Setup"]
@@ -46,6 +47,7 @@ flowchart TD
         TxBuffer["TX Buffer"]
         FrameGen["Frame Generator"]
   end
+end
  subgraph T_SyncWorker["Sync-Worker"]
         MultiSync["Multi-Channel Synchronization"]
         PhiErrorCorrection["Phase Offset Correction"]
@@ -70,7 +72,7 @@ flowchart TD
     UsrpDevices -- Provide Stream Instance ---> RxStream & TxStream
     RxStream -- Forward Samples --> SampleBlock
     RxStream -- Provide Timestamp --> SampleBlock
-    SampleBlock -- Push Sample Block --> RxSampleQueue["RX Sample Queue"]
+    SampleBlock -- Push Sample Block --> RxSampleQueue["RX Sample Queue [0..*]"]
     CheckForPhaseCmd -- Push Phase Offset ---> PhiErrorQueue["Phase Offset Queue"]
     PhiErrorQueue -- Provide Phase Offset ---> PhiErrorCorrection
     PhiErrorCorrection -- Adjust Phase ---> MultiSync
@@ -82,9 +84,8 @@ flowchart TD
     MultiSync -- Push CFR ---> CfrQueue["CFR Queue"]
     CfrQueue -- Provide CFR ---> FindGroups
     FindGroups -- Provide Group ---> ZmqSocket & MatlabCfrExport
-    ReadInput -----> CheckForPhaseCmd
-    ReadInput -----> CheckForExitCmd
-    CheckForExitCmd--Triggers--->Exit
+    ReadInput -----> CheckForPhaseCmd & CheckForExitCmd
+    CheckForExitCmd -- Triggers ---> Exit
 
 ```
 
