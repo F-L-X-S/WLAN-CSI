@@ -23,6 +23,72 @@ This project aims to provide a flexible software architecture, to implement and 
 ## DoA estimation with USRP N210
  The [Main Application](src/main.cc) gives you a functioning example on how to employ the provided modules for DoA estimation with USRP N210. 
 
+### Main App Process Flow
+```mermaid
+---
+config:
+  look: classic
+  layout: elk
+  theme: dark
+---
+flowchart TD
+ subgraph T_StreamWorker["Stream-Worker"]
+        UsrpDevices["USRP Device Interface [0..*]"]
+        UsrpConf["USRP Interface Setup"]
+        StreamConf["Timed Stream Command"]
+  end
+ subgraph T_RxWorker["RX-Worker [0..*]"]
+        RxStream["RX Stream Interface"]
+        SampleBlock["Sample Block Buffer"]
+  end
+ subgraph T_TxWorker["TX-Worker [0..*]"]
+        TxStream["TX Stream Interface"]
+        TxBuffer["TX Buffer"]
+        FrameGen["Frame Generator"]
+  end
+ subgraph T_SyncWorker["Sync-Worker"]
+        MultiSync["Multi-Channel Synchronization"]
+        PhiErrorCorrection["Phase Offset Correction"]
+  end
+ subgraph T_CfrWorker["CFR-Worker"]
+        ZmqSocket["ZMQ socket"]
+        MatlabCfrExport["MATLAB Export"]
+        FindGroups["Find CFR Groups"]
+  end
+ subgraph T_CbDataWorker["Callback-Data-Worker"]
+        MatlabCbExport["MATLAB Export"]
+  end
+ subgraph T_TerminalWorker["Terminal-Worker"]
+        CheckForPhaseCmd["Check for Phase Adjustment Command"]
+        CheckForExitCmd["Check for Exit Command"]
+        Exit["Exit Streaming"]
+        ReadInput["Read Terminal Inputs"]
+  end
+    UsrpConf -- Configure Interfaces ---> UsrpDevices
+    UsrpDevices -- Provide Device Time --> StreamConf
+    StreamConf -- Issue Command  --> UsrpDevices
+    UsrpDevices -- Provide Stream Instance ---> RxStream & TxStream
+    RxStream -- Forward Samples --> SampleBlock
+    RxStream -- Provide Timestamp --> SampleBlock
+    SampleBlock -- Push Sample Block --> RxSampleQueue["RX Sample Queue"]
+    CheckForPhaseCmd -- Push Phase Offset ---> PhiErrorQueue["Phase Offset Queue"]
+    PhiErrorQueue -- Provide Phase Offset ---> PhiErrorCorrection
+    PhiErrorCorrection -- Adjust Phase ---> MultiSync
+    RxSampleQueue -- Provide Sample Blocks ---> MultiSync
+    FrameGen -- Write Content ---> TxBuffer
+    TxStream -- Transmit Content ---> TxBuffer
+    MultiSync -- Push Callback Data ---> CbDataQueue["CB-Data Queue"]
+    CbDataQueue -- Provide Callback Data ---> MatlabCbExport
+    MultiSync -- Push CFR ---> CfrQueue["CFR Queue"]
+    CfrQueue -- Provide CFR ---> FindGroups
+    FindGroups -- Provide Group ---> ZmqSocket & MatlabCfrExport
+    ReadInput -----> CheckForPhaseCmd
+    ReadInput -----> CheckForExitCmd
+    CheckForExitCmd--Triggers--->Exit
+
+```
+
+
 ### Hardware Setup 
 The software is tested using two USRP N210 with the WBXv3 daughterboard. Phase synchronization is achieved with the MIMO-cable. The USRPs are connected to the host by separate ethernet interfaces. For utilizing a different type of SDRs, the interfaces can be implemented in separated threads similar to `multi_rx.h`.  <br>
 One USRP is used for transmitting and receiving the OFDM packages while the other USRP is used in RX-mode only. The MUSIC-spectrum visualizes the position of the TX-antenna. 
