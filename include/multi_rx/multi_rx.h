@@ -86,7 +86,25 @@ struct PhaseQueue_t
     std::condition_variable cv;
 };
 
-// Stream Worker starts USRP streams
+/**
+ * @brief The stream_worker function references the UHD USRP interfaces, configuring all available instances simultaneously, 
+ * with one designated as the master device for the MIMO configuration. Sample streaming to or from the USRP devices is accomplished 
+ * by issuing stream commands. To prevent synchronization issues arising from variable program execution times, 
+ * timed stream commands based on the device time are constructed and dispatched to the USRPs. 
+ * For stable timing synchronization, the stream command that initiates continuous streaming is constructed and re-issued 
+ * after a defined cycle time by the stream_worker function.
+ * 
+ * This function is executed within a separated thread.
+ * 
+ * @tparam num_channels 
+ * @param usrps Reference to array with UHD USRP interfaces
+ * @param max_samps Max. number of samples to receive per frame from the USRP
+ * @param tx_rate TX Sample Rate [Sps]
+ * @param rx_rate RX Sample Rate [Sps]
+ * @param center_freq Center Frequency [Hz]
+ * @param cycle_time Execution cycle time (Stream restart after 10 cycles) [ms]
+ * @param stop_signal_called Stop signal to terminate the thread
+ */
 template <std::size_t num_channels>
 void stream_worker( std::array<uhd::usrp::multi_usrp::sptr, num_channels>& usrps,
                     size_t& max_samps, 
@@ -189,7 +207,18 @@ void stream_worker( std::array<uhd::usrp::multi_usrp::sptr, num_channels>& usrps
 
 }
 
-// TX-Worker sends specified buffer, repeating after cycle time [ms]
+/**
+ * @brief tx_worker reads the referenced buffer at the specified cycle time and forwards the data 
+ * to the streamer for transmission. The buffer contains the baseband time‑domain sequence to be transmitted 
+ * in the next cycle.
+ * 
+ * This function is executed within a dedicated thread for each uhd::tx\_streamer::sptr instance.
+ * 
+ * @param tx_stream Reference to the TX streamer interface
+ * @param buff Baseband time‑domain sequence to be transmitted
+ * @param cycle_time Cycle time to read and transmit the buffer [ms]
+ * @param stop_signal_called Stop signal to terminate the thread
+ */
 void tx_worker(uhd::tx_streamer::sptr tx_stream,
                 std::vector<Sample_t>& buff,
                 unsigned int cycle_time,
@@ -213,7 +242,20 @@ void tx_worker(uhd::tx_streamer::sptr tx_stream,
 }
 
 
-// RX-Worker receives samples from the USRP and pushes them into a thread-safe queue
+/**
+ * @brief rx_worker reads the complex samples from the referenced uhd::rx\_streamer::sptr instance and 
+ * forwards each cycle's batch of samples as a block to a dedicated queue. To enable precise frame timing identification, 
+ * the rx_worker attaches the USRP device time to the corresponding sample block. This timestamp is supplied by the 
+ * streamer instance as metadata for each packet received from the USRP. The performance of this function is critical, 
+ * as insufficient processing efficiency may result in overflow errors of the UHD driver.
+ * 
+ * This function is executed within a dedicated thread for each uhd::rx\_streamer::sptr instance.
+ * 
+ * @tparam buffer_size Max. number of samples to receive per frame from the USRP
+ * @param rx_stream Reference to the RX streamer interface
+ * @param q Reference to the thread-safe queue to push the received sample blocks
+ * @param stop_signal_called Stop signal to terminate the thread
+ */
 template <std::size_t buffer_size>
 void rx_worker( uhd::rx_streamer::sptr rx_stream,
                 RxSamplesQueue_t& q,
@@ -234,7 +276,29 @@ void rx_worker( uhd::rx_streamer::sptr rx_stream,
     }
 }
 
-// Sync-Worker processes queued samples from RX-workers and pushes the resulting CFRs into a thread-safe queue
+/**
+ * @brief The sync_worker function continuously retrieves timestamped sample-blocks from the channel-specific queues and 
+ * executes the synchronization algorithm on these samples through the MultiSync instance. 
+ * When a frame is detected by a channel’s synchronizer, the resulting CFR and associated callback data are pushed into 
+ * thread-safe queues for use in subsequent processing stages. 
+ * The queued data is tagged with the timestamp and the channel number of the synchronized sample-block, in which the frame was detected.
+ * 
+ * Throughout the synchronization process, phase corrections can be applied to the NCOs of the MultiSync instance to compensate 
+ * the phase errors introduced by the hardware instances.
+ * 
+ * This function is executed within a dedicated thread.
+ * 
+ * @tparam num_channels Number of Channels to synchronize
+ * @tparam syncronizer_type Type of the synchronizer to use (e.g. ofdmframesync)
+ * @tparam cb_data_type Callback-data type to use 
+ * @param ms Reference to the MultiSync instance
+ * @param cb_data Reference to the array of callback-data structures (one for each channel)
+ * @param rx_queues Reference to the array of thread-safe queues storing received sample blocks (one for each channel)
+ * @param cfr_queue Reference to the thread-safe queue to push the detected CFRs
+ * @param cbdata_queue Reference to the thread-safe queue to push the Callback-data
+ * @param phi_error_queue Reference to the thread-safe queue to receive phase corrections for the NCOs
+ * @param stop_signal_called Stop signal to terminate the thread
+ */
 template <std::size_t num_channels, typename syncronizer_type, typename cb_data_type>
 void sync_worker(   syncronizer_type& ms,
                     std::array<CallbackData_t, num_channels>& cb_data,
@@ -322,7 +386,23 @@ void sync_worker(   syncronizer_type& ms,
     }
 }
 
-// Export-Worker processes queued CFRs from Sync-workers and either discards them or exports them to a ZMQ socket
+/**
+ * @brief The cfr_export_worker first identifies queued CFRs whose timestamps all fall within a specified time range 
+ * and whose channel numbers are all unique within that group. 
+ * Grouping minimizes the number of forwarded CFRs that correspond to frames not detected across all channels. 
+ * Once a complete group is identified, the function exports the group simultaneously through the referenced ZmqSender and MatlabExport instances. 
+ * The function includes buffer management to maintain efficiency by removing processed CFRss without valid groups while retaining a minimum number of entries per channel. 
+ * At termination, it adds plotting commands to the MatlabExport instance to visualize magnitude, phase, and complex representation of the exported CFRs. 
+ * 
+ * This function is executed within a dedicated thread.
+ * 
+ * @tparam num_channels Number of Channels CFRs belong to
+ * @param cfr_queue Reference to the thread-safe queue storing the detected CFRs
+ * @param max_age Time-range within which the timestamps of a CFRs corresponding to one frame must fall
+ * @param sender Reference to the ZmqSender instance for exporting the CFR groups
+ * @param m_file Reference to the MatlabExport instance for exporting the CFR groups
+ * @param stop_signal_called Stop signal to terminate the thread
+ */
 template <std::size_t num_channels>
 void cfr_export_worker( CfrQueue_t& cfr_queue, 
                     uhd::time_spec_t max_age,
@@ -443,7 +523,17 @@ void cfr_export_worker( CfrQueue_t& cfr_queue,
 
 }
 
-// Export-Worker processes queued CB-Data from a Sync-worker and exports them to a MATLAB file
+/**
+ * @brief cbdata_export_worker is responsible for forwarding the queued callback-data items to the associated MatlabExport instance.
+ * Upon termination, the worker additionally generates the Matlab plotting commands required to visualize the constellation diagrams 
+ * of all received frames and appends them to the MatlabExport instance.
+ * 
+ * This function is executed within a dedicated thread.
+ * 
+ * @param cbdata_queue Reference to thread-safe queue storing the callback-data items
+ * @param m_file Reference to the MatlabExport instance for exporting the callback-data items
+ * @param stop_signal_called Stop signal to terminate the thread
+ */
 void cbdata_export_worker(  CbDataQueue_t& cbdata_queue, 
                             MatlabExport& m_file,
                             std::atomic<bool>& stop_signal_called) {
@@ -494,7 +584,17 @@ void cbdata_export_worker(  CbDataQueue_t& cbdata_queue,
     m_file.Add(matlab_cmd.str());
 }
 
-// Terminal Worker waits for user input 
+/**
+ * @brief terminal_worker reads terminal inputs. 
+ * Possible commands:
+ * adjust_phase <channel> <phase in rad> : push phase correction for the specified channel to the phi_error_queue 
+ * exit : terminate program
+ * q : terminate program
+ * quit : terminate program
+ * 
+ * @param phi_error_queue Reference to the thread-safe queue to send phase corrections for channel synchronizers
+ * @param stop_signal_called Stop signal to terminate the program
+ */
 void terminal_worker(    PhaseQueue_t& phi_error_queue,
                         std::atomic<bool>& stop_signal_called) {
     
