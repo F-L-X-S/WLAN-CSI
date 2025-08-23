@@ -22,6 +22,7 @@ This project aims to provide a flexible software architecture, to implement and 
 
 ## DoA estimation with USRP N210
  The [Main Application](src/main.cc) gives you a functioning example on how to employ the provided modules for DoA estimation with USRP N210. 
+![Demo of DoA Estimation](https://github.com/F-L-X-S/doa4rfc/raw/main/docs/assets/doa4rfc.gif)
 
 ### Main App Process Flow
 ```mermaid
