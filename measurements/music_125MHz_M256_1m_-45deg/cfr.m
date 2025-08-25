@@ -108,11 +108,26 @@ CH1_276382 = [ ...
 0 + 1i*0, 0 + 1i*0, 0 + 1i*0, 0 + 1i*0, 0 + 1i*0,  ...
 0 + 1i*0];
 
-figure;subplot(2,1,1); hold on;plot(abs(CH0_276383), 'DisplayName', 'CH0_276383');title('Channel Frequency Response Gain'); legend; grid on;
-subplot(2,1,2); hold on;plot(angle(CH0_276383), 'DisplayName', 'CH0_276383');title('Channel Frequency Response Phase'); legend; grid on;
-figure;plot(real(CH0_276383), imag(CH0_276383), '.', 'DisplayName', 'CH0_276383'); hold on;title('CFR'); xlabel('Real'); ylabel('Imag'); axis equal; legend; grid on;
+subplot(2,1,1); hold on;
+plot(abs(CH0_276383), 'DisplayName', 'Channel 0');
+plot(abs(CH1_276382), 'DisplayName', 'Channel 1');
+title('Channel Frequency Response Gain');
+legend;
+grid on;
 
-figure;subplot(2,1,1); hold on;plot(abs(CH1_276382), 'DisplayName', 'CH1_276382');title('Channel Frequency Response Gain'); legend; grid on;
-subplot(2,1,2); hold on;plot(angle(CH1_276382), 'DisplayName', 'CH1_276382');title('Channel Frequency Response Phase'); legend; grid on;
-figure;plot(real(CH1_276382), imag(CH1_276382), '.', 'DisplayName', 'CH1_276382'); hold on;title('CFR'); xlabel('Real'); ylabel('Imag'); axis equal; legend; grid on;
+subplot(2,1,2); hold on;
+plot(angle(CH0_276383), 'DisplayName', 'Channel 0');
+plot(angle(CH1_276382), 'DisplayName', 'Channel 1');
+title('Channel Frequency Response Phase');
+legend;
+grid on;
 
+figure; hold on;
+plot(real(CH0_276383), imag(CH0_276383), '.', 'DisplayName', 'Channel 0');
+plot(real(CH1_276382), imag(CH1_276382), '.', 'DisplayName', 'Channel 1');
+title('Channel Frequency Response (CFR)');
+xlabel('Real');
+ylabel('Imaginary');
+axis equal;
+legend;
+grid on;
