@@ -108,11 +108,19 @@ CH1_78137 = [ ...
 0 + 1i*0, 0 + 1i*0, 0 + 1i*0, 0 + 1i*0, 0 + 1i*0,  ...
 0 + 1i*0];
 
-figure;subplot(2,1,1); hold on;plot(abs(CH0_78137), 'DisplayName', 'CH0_78137');title('Channel Frequency Response Gain'); legend; grid on;
-subplot(2,1,2); hold on;plot(angle(CH0_78137), 'DisplayName', 'CH0_78137');title('Channel Frequency Response Phase'); legend; grid on;
-figure;plot(real(CH0_78137), imag(CH0_78137), '.', 'DisplayName', 'CH0_78137'); hold on;title('CFR'); xlabel('Real'); ylabel('Imag'); axis equal; legend; grid on;
+M = length(CH0_78137); subcarrier_idx = (-floor(M/2)):(M-floor(M/2)-1);
+figure; subplot(2,1,1); hold on; grid on;
+plot(subcarrier_idx, abs(CH0_78137));legend_labels{1} = sprintf('CH %d', 0);
+plot(subcarrier_idx, abs(CH1_78137));legend_labels{2} = sprintf('CH %d', 1);
 
-figure;subplot(2,1,1); hold on;plot(abs(CH1_78137), 'DisplayName', 'CH1_78137');title('Channel Frequency Response Gain'); legend; grid on;
-subplot(2,1,2); hold on;plot(angle(CH1_78137), 'DisplayName', 'CH1_78137');title('Channel Frequency Response Phase'); legend; grid on;
-figure;plot(real(CH1_78137), imag(CH1_78137), '.', 'DisplayName', 'CH1_78137'); hold on;title('CFR'); xlabel('Real'); ylabel('Imag'); axis equal; legend; grid on;
+title('Channel Frequency Response Gain');xlabel('Subcarrier index'); ylabel('Gain [V^2]');xlim([subcarrier_idx(1), subcarrier_idx(end)]);legend(legend_labels, 'Location', 'best');hold off;
+subplot(2,1,2); hold on; grid on;
+plot(subcarrier_idx, angle(CH0_78137));
+plot(subcarrier_idx, angle(CH1_78137));
 
+title('Channel Frequency Response Phase');xlabel('Subcarrier index'); ylabel('Phase [rad]');xlim([subcarrier_idx(1), subcarrier_idx(end)]);legend(legend_labels, 'Location', 'best');hold off;
+figure; hold on; grid on; axis equal;
+plot(real(CH0_78137), imag(CH0_78137), '.', 'MarkerSize', 10);
+plot(real(CH1_78137), imag(CH1_78137), '.', 'MarkerSize', 10);
+
+xlabel('Real'); ylabel('Imaginary');title('Channel Frequency Response');legend(legend_labels, 'Location', 'best');hold off;
