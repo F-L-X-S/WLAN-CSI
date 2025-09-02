@@ -50,8 +50,8 @@
 
 #define NUM_CHANNELS 2                                          // Number of Channels (USRP-devices)   
 #define SYMBOLS_PER_FRAME 1                                     // Number of Symbols to send per frame 
-#define OUTFILE_CFR "./measurements/music_125MHz_M256_1m_0deg/cfr.m"         // Output file in MATLAB-format to store results
-#define OUTFILE_CBDATA "./measurements/music_125MHz_M256_1m_0deg/cbdata.m"   // Output file in MATLAB-format to store results
+#define OUTFILE_CFR "./measurements/music_125MHz_M256_1m/music_125MHz_M256_1m_10deg/cfr.m"         // Output file in MATLAB-format to store results
+#define OUTFILE_CBDATA "./measurements/music_125MHz_M256_1m/music_125MHz_M256_1m_10deg/cbdata.m"   // Output file in MATLAB-format to store results
 
 #define PYTHONPATH "./music/env/bin/python"
 #define MUSIC_PYFILE "./music/music-spectrum.py"                // Python script with MUSIC algorithm for DoA estimation
